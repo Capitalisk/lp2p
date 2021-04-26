@@ -173,7 +173,7 @@ const validateProtocolMessage = (message) => {
 
 const checkNetworkCompatibility = (peerInfo, nodeInfo) => {
   if (!peerInfo.nethash) {
-    return false;
+    return true;
   }
 
   return peerInfo.nethash === nodeInfo.nethash;
