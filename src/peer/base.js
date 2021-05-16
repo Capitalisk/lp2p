@@ -55,6 +55,8 @@ const REMOTE_RPC_UPDATE_PEER_INFO = 'updateMyself';
 const REMOTE_RPC_GET_NODE_INFO = 'status';
 const REMOTE_RPC_GET_PEERS_LIST = 'list';
 
+const REMOTE_MESSAGE_NODE_INFO_CHANGED = 'nodeInfoChanged';
+
 const DEFAULT_CONNECT_TIMEOUT = 2000;
 const DEFAULT_ACK_TIMEOUT = 2000;
 const DEFAULT_REPUTATION_SCORE = 100;
@@ -325,13 +327,20 @@ class Peer extends EventEmitter {
    */
   async applyNodeInfo(nodeInfo) {
     this._nodeInfo = nodeInfo;
-    // TODO later: This conversion step will not be needed after switching to the new LIP protocol version.
-    const legacyNodeInfo = convertNodeInfoToLegacyFormat(this._nodeInfo);
-    // TODO later: Consider using send instead of request for updateMyself for the next LIP protocol version.
-    await this.request({
-      procedure: REMOTE_RPC_UPDATE_PEER_INFO,
-      data: legacyNodeInfo,
-    });
+    if (this._peerInfo.isPassive) {
+      if (!this._socket) {
+        throw new Error('Passive peer socket does not exist');
+      }
+      this._socket.emit(REMOTE_MESSAGE_NODE_INFO_CHANGED, this._nodeInfo);
+    } else {
+      // TODO later: This conversion step will not be needed after switching to the new LIP protocol version.
+      const legacyNodeInfo = convertNodeInfoToLegacyFormat(this._nodeInfo);
+      // TODO later: Consider using send instead of request for updateMyself for the next LIP protocol version.
+      await this.request({
+        procedure: REMOTE_RPC_UPDATE_PEER_INFO,
+        data: legacyNodeInfo,
+      });
+    }
   }
 
   get nodeInfo() {
