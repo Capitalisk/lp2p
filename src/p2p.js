@@ -644,7 +644,7 @@ class P2P extends EventEmitter {
           return;
         }
 
-        const existingPeer = this._peerPool.getPeer(peerId);
+        const existingPeer = this._peerPool.getInboundPeer(peerId);
 
         if (existingPeer) {
           this._disconnectSocketDueToFailedHandshake(
