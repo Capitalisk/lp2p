@@ -2,21 +2,21 @@
   "name": "lp2p",
   "version": "4.0.0",
   "description": "Unstructured P2P library for use with Lisk-related software",
-  "author": "Leasehold, Lisk Foundation <admin@lisk.io>, lightcurve GmbH <admin@lightcurve.io>",
+  "author": "Leasehold",
   "license": "Apache-2.0",
   "keywords": [
-    "leasehold",
+    "capitalisk",
     "lisk",
     "blockchain",
     "p2p"
   ],
-  "homepage": "https://github.com/Leasehold/lp2p#readme",
+  "homepage": "https://github.com/Capitalisk/lp2p#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Leasehold/lp2p.git"
+    "url": "git+https://github.com/Capitalisk/lp2p.git"
   },
   "bugs": {
-    "url": "https://github.com/Leasehold/lp2p/issues"
+    "url": "https://github.com/Capitalisk/lp2p/issues"
   },
   "engines": {
     "node": ">=11.0",

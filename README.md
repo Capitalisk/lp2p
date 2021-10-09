@@ -1,6 +1,6 @@
 # lp2p
 
-lp2p is a P2P library for use with Leasehold-related software
+lp2p is a P2P library for use with Capitalisk-related software
 
 ## Installation
 
