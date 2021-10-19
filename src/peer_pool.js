@@ -413,26 +413,10 @@ class PeerPool extends EventEmitter {
   }
 
   getPeersCountPerKind() {
-    return [
-      ...this._outboundPeerMap.values(),
-      ...this._inboundPeerMap.values(),
-    ].reduce(
-      (prev, peer) => {
-        if (peer.kind === PEER_KIND_OUTBOUND) {
-          return {
-            outboundCount: prev.outboundCount + 1,
-            inboundCount: prev.inboundCount,
-          };
-        } else if (peer.kind === PEER_KIND_INBOUND) {
-          return {
-            outboundCount: prev.outboundCount,
-            inboundCount: prev.inboundCount + 1,
-          };
-        }
-        throw new Error('A non-identified peer exists in the pool.');
-      },
-      { outboundCount: 0, inboundCount: 0 },
-    );
+    return {
+      outboundCount: this._outboundPeerMap.size,
+      inboundCount: this._inboundPeerMap.size,
+    };
   }
 
   removeAllPeers() {
@@ -541,11 +525,16 @@ class PeerPool extends EventEmitter {
   }
 
   applyPenalty(peerPenalty) {
-    const peer = this._outboundPeerMap.get(peerPenalty.peerId) ||
-      this._inboundPeerMap.get(peerPenalty.peerId);
+    const outboundPeer = this._outboundPeerMap.get(peerPenalty.peerId);
+    const inboundPeer = this._inboundPeerMap.get(peerPenalty.peerId);
 
-    if (peer) {
-      peer.applyPenalty(peerPenalty.penalty);
+    if (outboundPeer || inboundPeer) {
+      if (outboundPeer) {
+        outboundPeer.applyPenalty(peerPenalty.penalty);
+      }
+      if (inboundPeer) {
+        inboundPeer.applyPenalty(peerPenalty.penalty);
+      }
 
       return;
     }

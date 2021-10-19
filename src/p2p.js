@@ -564,8 +564,7 @@ class P2P extends EventEmitter {
 
         if (
           (!queryObject.isPassive && typeof queryObject.wsPort !== 'string') ||
-          typeof queryObject.version !== 'string' ||
-          typeof queryObject.nethash !== 'string'
+          typeof queryObject.version !== 'string'
         ) {
           this._disconnectSocketDueToFailedHandshake(
             socket,

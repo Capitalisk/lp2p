@@ -171,14 +171,6 @@ const validateProtocolMessage = (message) => {
   return protocolMessage;
 };
 
-const checkNetworkCompatibility = (peerInfo, nodeInfo) => {
-  if (!peerInfo.nethash) {
-    return true;
-  }
-
-  return peerInfo.nethash === nodeInfo.nethash;
-};
-
 const checkProtocolVersionCompatibility = (peerInfo, nodeInfo) => {
   // Backwards compatibility for older peers which do not have a protocolVersion field.
   if (!peerInfo.protocolVersion) {
@@ -199,13 +191,6 @@ const checkProtocolVersionCompatibility = (peerInfo, nodeInfo) => {
 };
 
 const checkPeerCompatibility = (peerInfo, nodeInfo) => {
-  if (!checkNetworkCompatibility(peerInfo, nodeInfo)) {
-    return {
-      success: false,
-      errors: [INCOMPATIBLE_NETWORK_REASON],
-    };
-  }
-
   if (!checkProtocolVersionCompatibility(peerInfo, nodeInfo)) {
     return {
       success: false,
@@ -312,7 +297,6 @@ module.exports = {
   validatePeersInfoList,
   validateRPCRequest,
   validateProtocolMessage,
-  checkNetworkCompatibility,
   checkProtocolVersionCompatibility,
   checkPeerCompatibility,
   sanitizePeerLists,
