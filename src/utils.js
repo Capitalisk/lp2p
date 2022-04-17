@@ -29,6 +29,9 @@ const IPV6_UNCOMPRESSED_COLON_COUNT = 7;
 const COLON_REGEX = /:/g;
 const DOUBLE_COLON_REGEX = /::/g;
 
+const IPV6_PEER_HOST_REGEX = /\[([^\[]*)\]/;
+const IPV6_PEER_PORT_REGEX = /\[[^\[]*\]:([^:]*)/;
+
 const NETWORK = {
   NET_IPV4: 0,
   NET_IPV6: 1,
@@ -88,6 +91,7 @@ const isLocal = (address) => {
 }
 
 const getNetwork = (address) => {
+  let preva = address;
   if (isLocal(address)) {
     return NETWORK.NET_LOCAL;
   }
@@ -133,7 +137,6 @@ const getBucketId = (options) => {
   secretBytes.writeUInt32BE(secret, 0);
 
   const network = getNetwork(targetAddress);
-
   if (network === NETWORK.NET_OTHER) {
     throw Error('IP address is unsupported.');
   }
@@ -160,8 +163,28 @@ const getBucketId = (options) => {
   return hash(bucketBytes).readUInt32BE(0) % bucketCount;
 };
 
-const constructPeerIdFromPeerInfo = (peerInfo) =>
-  `${peerInfo.ipAddress}:${peerInfo.wsPort}`;
+const constructPeerIdFromPeerInfo = (peerInfo) => {
+  if (isIPv6(peerInfo.ipAddress)) {
+    return `[${peerInfo.ipAddress}]:${peerInfo.wsPort}`;
+  }
+  return `${peerInfo.ipAddress}:${peerInfo.wsPort}`;
+};
+
+const getHostFromPeerId = (peerId) => {
+  let peerIpv6Host = (peerId.match(IPV6_PEER_HOST_REGEX) || [])[1];
+  if (peerIpv6Host) {
+    return peerIpv6Host;
+  }
+  return peerId.split(':')[0];
+};
+
+const getPortFromPeerId = (peerId) => {
+  let peerIpv6Port = (peerId.match(IPV6_PEER_PORT_REGEX) || [])[1];
+  if (peerIpv6Port) {
+    return parseInt(peerIpv6Port);
+  }
+  return parseInt(peerId.split(':')[1]);
+};
 
 module.exports = {
   PEER_TYPE,
@@ -171,4 +194,6 @@ module.exports = {
   getNetwork,
   getBucketId,
   constructPeerIdFromPeerInfo,
+  getHostFromPeerId,
+  getPortFromPeerId,
 };

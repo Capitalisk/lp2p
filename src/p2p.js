@@ -71,7 +71,7 @@ const {
   EVENT_UPDATED_PEER_INFO,
   PeerPool,
 } = require('./peer_pool');
-const { constructPeerIdFromPeerInfo } = require('./utils');
+const { constructPeerIdFromPeerInfo, getHostFromPeerId, getPortFromPeerId } = require('./utils');
 const {
   checkPeerCompatibility,
   outgoingPeerInfoSanitization,
@@ -253,14 +253,16 @@ class P2P extends EventEmitter {
     };
 
     this._handleBanPeer = (peerId) => {
-      this._bannedPeers.add(peerId.split(':')[0]);
+      const peerHost = getHostFromPeerId(peerId);
+      const peerPort = getPortFromPeerId(peerId);
+      this._bannedPeers.add(peerHost);
       const isWhitelisted = this._sanitizedPeerLists.whitelisted.find(
         peer => constructPeerIdFromPeerInfo(peer) === peerId,
       );
 
       const bannedPeerInfo = {
-        ipAddress: peerId.split(':')[0],
-        wsPort: +peerId.split(':')[1],
+        ipAddress: peerHost,
+        wsPort: peerPort,
       };
 
       if (this._peerBook.getPeer(bannedPeerInfo) && !isWhitelisted) {
@@ -271,7 +273,8 @@ class P2P extends EventEmitter {
     };
 
     this._handleUnbanPeer = (peerId) => {
-      this._bannedPeers.delete(peerId.split(':')[0]);
+      const peerHost = getHostFromPeerId(peerId);
+      this._bannedPeers.delete(peerHost);
       // Re-emit the message to allow it to bubble up the class hierarchy.
       this.emit(EVENT_UNBAN_PEER, peerId);
     };

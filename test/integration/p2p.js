@@ -170,7 +170,7 @@ describe('Integration tests for P2P library', () => {
         const firstP2PNode = p2pNodeList[0];
         const badPeer = firstP2PNode.getConnectedPeers()[1];
         const peerPenalty = {
-          peerId: `${badPeer.ipAddress}:${badPeer.wsPort}`,
+          peerId: `[${badPeer.ipAddress}]:${badPeer.wsPort}`,
           penalty: 10,
         };
         firstP2PNode.applyPenalty(peerPenalty);
@@ -184,7 +184,7 @@ describe('Integration tests for P2P library', () => {
         const firstP2PNode = p2pNodeList[0];
         const badPeer = firstP2PNode.getConnectedPeers()[2];
         const peerPenalty = {
-          peerId: `${badPeer.ipAddress}:${badPeer.wsPort}`,
+          peerId: `[${badPeer.ipAddress}]:${badPeer.wsPort}`,
           penalty: 100,
         };
         firstP2PNode.applyPenalty(peerPenalty);
@@ -199,7 +199,7 @@ describe('Integration tests for P2P library', () => {
         const firstP2PNode = p2pNodeList[0];
         const badPeer = firstP2PNode.getConnectedPeers()[2];
         const peerPenalty = {
-          peerId: `${badPeer.ipAddress}:${badPeer.wsPort}`,
+          peerId: `[${badPeer.ipAddress}]:${badPeer.wsPort}`,
           penalty: 100,
         };
         firstP2PNode.applyPenalty(peerPenalty);
@@ -663,7 +663,7 @@ describe('Integration tests for P2P library', () => {
           .which.is.equal('test');
         expect(collectedMessages[0].message)
           .to.have.property('peerId')
-          .which.is.equal(`::1:${NETWORK_START_PORT}`);
+          .which.is.equal(`[::1]:${NETWORK_START_PORT}`);
       });
     });
 
@@ -801,7 +801,7 @@ describe('Integration tests for P2P library', () => {
         const firstP2PNode = p2pNodeList[0];
 
         const targetPeerPort = NETWORK_START_PORT + 3;
-        const targetPeerId = `::1:${targetPeerPort}`;
+        const targetPeerId = `[::1]:${targetPeerPort}`;
 
         firstP2PNode.sendToPeer(
           {
@@ -855,7 +855,7 @@ describe('Integration tests for P2P library', () => {
         const firstP2PNode = p2pNodeList[0];
 
         const targetPeerPort = NETWORK_START_PORT + 4;
-        const targetPeerId = `::1:${targetPeerPort}`;
+        const targetPeerId = `[::1]:${targetPeerPort}`;
 
         await firstP2PNode.requestFromPeer(
           {
@@ -875,7 +875,7 @@ describe('Integration tests for P2P library', () => {
         const firstP2PNode = p2pNodeList[0];
 
         const targetPeerPort = NETWORK_START_PORT + 2;
-        const targetPeerId = `::1:${targetPeerPort}`;
+        const targetPeerId = `[::1]:${targetPeerPort}`;
 
         const response = await firstP2PNode.requestFromPeer(
           {
@@ -1059,7 +1059,7 @@ describe('Integration tests for P2P library', () => {
         const ratePerSecondUpperBound = 130;
 
         const targetPeerPort = NETWORK_START_PORT + 3;
-        const targetPeerId = `::1:${targetPeerPort}`;
+        const targetPeerId = `[::1]:${targetPeerPort}`;
 
         for (let i = 0; i < TOTAL_SENDS; i++) {
           await wait(10);
@@ -1091,7 +1091,7 @@ describe('Integration tests for P2P library', () => {
           removedPeers.push(peerId);
         });
 
-        const targetPeerId = `::1:${secondP2PNode.nodeInfo.wsPort}`;
+        const targetPeerId = `[::1]:${secondP2PNode.nodeInfo.wsPort}`;
 
         for (let i = 0; i < TOTAL_SENDS; i++) {
           await wait(1);
@@ -1108,7 +1108,7 @@ describe('Integration tests for P2P library', () => {
 
         await wait(200);
 
-        expect(removedPeers).to.contain('::1:5000');
+        expect(removedPeers).to.contain('[::1]:5000');
       });
     });
 
@@ -1148,7 +1148,7 @@ describe('Integration tests for P2P library', () => {
         const ratePerSecondUpperBound = 100;
 
         const targetPeerPort = NETWORK_START_PORT + 3;
-        const targetPeerId = `::1:${targetPeerPort}`;
+        const targetPeerId = `[::1]:${targetPeerPort}`;
 
         for (let i = 0; i < TOTAL_SENDS; i++) {
           await wait(20);
@@ -1180,7 +1180,7 @@ describe('Integration tests for P2P library', () => {
           removedPeers.push(peerId);
         });
 
-        const targetPeerId = `::1:${thirdP2PNode.nodeInfo.wsPort}`;
+        const targetPeerId = `[::1]:${thirdP2PNode.nodeInfo.wsPort}`;
 
         for (let i = 0; i < TOTAL_SENDS; i++) {
           await wait(1);
@@ -1199,7 +1199,7 @@ describe('Integration tests for P2P library', () => {
 
         await wait(200);
 
-        expect(removedPeers).to.contain('::1:5002');
+        expect(removedPeers).to.contain('[::1]:5002');
       });
     });
   });
@@ -1637,7 +1637,7 @@ describe('Integration tests for P2P library', () => {
           .which.is.equal('bar');
         expect(response.data)
           .to.have.property('requestPeerId')
-          .which.is.equal(`::1:${secondP2PNode.nodeInfo.wsPort}`);
+          .which.is.equal(`[::1]:${secondP2PNode.nodeInfo.wsPort}`);
       });
 
       // Check for even distribution of requests across the network. Account for an error margin.
