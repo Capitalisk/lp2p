@@ -202,13 +202,7 @@ const checkPeerCompatibility = (peerInfo, nodeInfo) => {
 };
 
 const sanitizePeerLists = (lists, nodeInfo) => {
-  const blacklistedPeers = lists.blacklistedPeers.filter(peerInfo => {
-    if (peerInfo.ipAddress === nodeInfo.ipAddress) {
-      return false;
-    }
-
-    return true;
-  });
+  const blacklistedPeers = [...lists.blacklistedPeers];
 
   const blacklistedIPs = blacklistedPeers.map(peerInfo => peerInfo.ipAddress);
 
@@ -221,10 +215,6 @@ const sanitizePeerLists = (lists, nodeInfo) => {
   });
 
   const fixedPeers = lists.fixedPeers.filter(peerInfo => {
-    if (peerInfo.ipAddress === nodeInfo.ipAddress) {
-      return false;
-    }
-
     if (blacklistedIPs.includes(peerInfo.ipAddress)) {
       return false;
     }
@@ -233,10 +223,6 @@ const sanitizePeerLists = (lists, nodeInfo) => {
   });
 
   const whitelisted = lists.whitelisted.filter(peerInfo => {
-    if (peerInfo.ipAddress === nodeInfo.ipAddress) {
-      return false;
-    }
-
     if (blacklistedIPs.includes(peerInfo.ipAddress)) {
       return false;
     }
@@ -261,10 +247,6 @@ const sanitizePeerLists = (lists, nodeInfo) => {
   });
 
   const previousPeers = lists.previousPeers.filter(peerInfo => {
-    if (peerInfo.ipAddress === nodeInfo.ipAddress) {
-      return false;
-    }
-
     if (blacklistedIPs.includes(peerInfo.ipAddress)) {
       return false;
     }

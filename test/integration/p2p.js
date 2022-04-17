@@ -1805,7 +1805,7 @@ describe('Integration tests for P2P library', () => {
             seedPeers,
             whitelistedPeers: [
               {
-                ipAddress: '127.0.0.3',
+                ipAddress: '::1',
                 wsPort: NETWORK_START_PORT,
               },
             ],
@@ -1866,7 +1866,7 @@ describe('Integration tests for P2P library', () => {
     describe('whitelist peer', () => {
       // Test to check if the whitelist peer is added to the sanitized whitelist.
       it('should have whitelistpeer from config', async () => {
-        expect(p2pNodeList[1]['_sanitizedPeerLists'].whitelisted).not.to.be
+        expect(p2pNodeList[0]['_sanitizedPeerLists'].whitelisted).not.to.be
           .empty;
       });
     });

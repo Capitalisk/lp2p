@@ -13,6 +13,8 @@
  *
  */
 
+ const { isIPv6 } = require('net');
+
 const {
   ClientOptionsUpdated,
   convertNodeInfoToLegacyFormat,
@@ -87,7 +89,7 @@ class OutboundPeer extends Peer {
 
     // Ideally, we should JSON-serialize the whole NodeInfo object but this cannot be done for compatibility reasons, so instead we put it inside an options property.
     const clientOptions = {
-      hostname: `[${this._ipAddress}]`,
+      hostname: isIPv6(this._ipAddress) ? `[${this._ipAddress}]` : this._ipAddress,
       port: this._wsPort,
       query: querystring.stringify({
         ...legacyNodeInfo,
