@@ -12,7 +12,7 @@
  * Removal or modification of this copyright notice is prohibited.
  *
  */
-const { constructPeerIdFromPeerInfo, getBucketId, PEER_TYPE } = require('../utils');
+const { getPeerIdFromPeerInfo, getBucketId, PEER_TYPE } = require('../utils');
 
 // Base peer list class is covering a basic peer list that has all the functionality to handle buckets with default eviction strategy
 class PeerList {
@@ -69,7 +69,7 @@ class PeerList {
     if (!bucket) {
       return false;
     }
-    const incomingPeerId = constructPeerIdFromPeerInfo(peerInfo);
+    const incomingPeerId = getPeerIdFromPeerInfo(peerInfo);
     const foundPeer = bucket.get(incomingPeerId);
 
     if (!foundPeer) {
@@ -88,7 +88,7 @@ class PeerList {
   removePeer(peerInfo) {
     const bucketId = this.selectBucketId(peerInfo.ipAddress);
     const bucket = this.peerMap.get(bucketId);
-    const incomingPeerId = constructPeerIdFromPeerInfo(peerInfo);
+    const incomingPeerId = getPeerIdFromPeerInfo(peerInfo);
 
     if (bucket && bucket.get(incomingPeerId)) {
       const result = bucket.delete(incomingPeerId);
@@ -102,7 +102,7 @@ class PeerList {
   getPeer(peerInfo) {
     const bucketId = this.selectBucketId(peerInfo.ipAddress);
     const bucket = this.peerMap.get(bucketId);
-    const incomingPeerId = constructPeerIdFromPeerInfo(peerInfo);
+    const incomingPeerId = getPeerIdFromPeerInfo(peerInfo);
 
     if (!bucket) {
       return undefined;
@@ -123,7 +123,7 @@ class PeerList {
   addPeer(peerInfo) {
     const bucketId = this.selectBucketId(peerInfo.ipAddress);
     const bucket = this.peerMap.get(bucketId);
-    const incomingPeerId = constructPeerIdFromPeerInfo(peerInfo);
+    const incomingPeerId = getPeerIdFromPeerInfo(peerInfo);
 
     if (!bucket) {
       return {

@@ -14,7 +14,7 @@
  */
 const DEFAULT_MAX_RECONNECT_TRIES = 3;
 
-const { constructPeerIdFromPeerInfo } = require('../utils');
+const { getPeerIdFromPeerInfo } = require('../utils');
 const { CustomPeerInfo, PeerList, PeerListConfig } = require('./peer_list');
 
 class TriedList extends PeerList {
@@ -68,7 +68,7 @@ class TriedList extends PeerList {
   failedConnectionAction(incomingPeerInfo) {
     const bucketId = this.selectBucketId(incomingPeerInfo.ipAddress);
     const bucket = this.peerMap.get(bucketId);
-    const incomingPeerId = constructPeerIdFromPeerInfo(incomingPeerInfo);
+    const incomingPeerId = getPeerIdFromPeerInfo(incomingPeerInfo);
 
     if (!bucket) {
       return false;

@@ -32,6 +32,9 @@ const DOUBLE_COLON_REGEX = /::/g;
 const IPV6_PEER_HOST_REGEX = /\[([^\[]*)\]/;
 const IPV6_PEER_PORT_REGEX = /\[[^\[]*\]:([^:]*)$/;
 
+const PROTOCOL_IPV4 = 'IPv4';
+const PROTOCOL_IPV6 = 'IPv6';
+
 const IPV6_HYBRID_REGEX = /ffff:([0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3})$/;
 
 const NETWORK = {
@@ -68,25 +71,25 @@ const normalizeIPv6Address = (ipv6Address) => {
 };
 
 const normalizeAddress = (address) => {
-  let protocolVersion;
+  let protocol;
   if (isIPv6(address)) {
     const nestedIPV4Matches = address.match(IPV6_HYBRID_REGEX);
     if (nestedIPV4Matches) {
-      protocolVersion = 4;
+      protocol = PROTOCOL_IPV4;
       return {
-        protocolVersion,
+        protocol,
         address: nestedIPV4Matches[1],
       };
     }
-    protocolVersion = 6;
+    protocol = PROTOCOL_IPV6;
     return {
-      protocolVersion,
+      protocol,
       address: normalizeIPv6Address(address),
     };
   }
-  protocolVersion = 4;
+  protocol = PROTOCOL_IPV4;
   return {
-    protocolVersion,
+    protocol,
     address
   };
 };
@@ -137,7 +140,7 @@ const getNetwork = (address) => {
   return NETWORK.NET_OTHER;
 };
 
-const getIPv6Bytes = (ipv6Address) => {
+const getIPV6Bytes = (ipv6Address) => {
   const normalizedAddress = normalizeIPv6Address(ipv6Address);
   const addressBuffers = normalizedAddress.split(':').map((part) => {
     const lengthDiff = IPV6_UNCOMPRESSED_PART_LENGTH - part.length;
@@ -147,7 +150,7 @@ const getIPv6Bytes = (ipv6Address) => {
   return Buffer.concat(addressBuffers);
 };
 
-const getIPv4Bytes = (ipv4Address) => {
+const getIPV4Bytes = (ipv4Address) => {
   const addressBuffers = ipv4Address.split('.').map((part) => {
     const partBuffer = Buffer.alloc(1);
     partBuffer.writeUInt8(parseInt(part));
@@ -178,7 +181,7 @@ const getBucketId = (options) => {
   }
 
   const addressBytes = network === NETWORK.NET_IPV6 ?
-    getIPv6Bytes(targetAddress) : getIPv4Bytes(targetAddress);
+    getIPV6Bytes(targetAddress) : getIPV4Bytes(targetAddress);
 
   const bucketBytes = Buffer.concat([
     secretBytes,
@@ -189,9 +192,9 @@ const getBucketId = (options) => {
   return hash(bucketBytes).readUInt32BE(0) % bucketCount;
 };
 
-const constructPeerIdFromPeerInfo = (peerInfo) => {
-  const { protocolVersion, address } = normalizeAddress(peerInfo.ipAddress);
-  if (protocolVersion === 6) {
+const getPeerIdFromPeerInfo = (peerInfo) => {
+  const { protocol, address } = normalizeAddress(peerInfo.ipAddress);
+  if (protocol === PROTOCOL_IPV6) {
     return `[${address}]:${peerInfo.wsPort}`;
   }
   return `${address}:${peerInfo.wsPort}`;
@@ -230,9 +233,11 @@ module.exports = {
   isLocal,
   getNetwork,
   getBucketId,
-  constructPeerIdFromPeerInfo,
+  getPeerIdFromPeerInfo,
   getHostFromPeerId,
   getPortFromPeerId,
   normalizeAddress,
   normalizePeerId,
+  PROTOCOL_IPV4,
+  PROTOCOL_IPV6,
 };

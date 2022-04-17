@@ -65,7 +65,7 @@ class PeerBook {
 
   getPeer(peerInfo) {
     const triedPeer = this._triedPeers.getPeer(peerInfo);
-    if (this._triedPeers.getPeer(peerInfo)) {
+    if (triedPeer) {
       return triedPeer;
     }
 

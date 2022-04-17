@@ -25,7 +25,7 @@ const {
   INCOMPATIBLE_NETWORK_REASON,
   INCOMPATIBLE_PROTOCOL_VERSION_REASON,
 } = require('./disconnect_status_codes');
-const { constructPeerIdFromPeerInfo, normalizeAddress } = require('./utils');
+const { getPeerIdFromPeerInfo, normalizeAddress } = require('./utils');
 
 const getByteSize = (object) =>
   Buffer.byteLength(JSON.stringify(object));
@@ -243,16 +243,16 @@ const sanitizePeerLists = (lists, nodeInfo) => {
 
       if (
         fixedPeers
-          .map(constructPeerIdFromPeerInfo)
-          .includes(constructPeerIdFromPeerInfo(peerInfo))
+          .map(getPeerIdFromPeerInfo)
+          .includes(getPeerIdFromPeerInfo(peerInfo))
       ) {
         return false;
       }
 
       if (
         seedPeers
-          .map(constructPeerIdFromPeerInfo)
-          .includes(constructPeerIdFromPeerInfo(peerInfo))
+          .map(getPeerIdFromPeerInfo)
+          .includes(getPeerIdFromPeerInfo(peerInfo))
       ) {
         return false;
       }

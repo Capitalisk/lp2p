@@ -50,7 +50,7 @@ const {
   PeerConfig,
 } = require('./peer');
 const { getUniquePeersbyIp } = require('./peer_selection');
-const { constructPeerIdFromPeerInfo } = require('./utils');
+const { getPeerIdFromPeerInfo } = require('./utils');
 
 const { EVICTED_PEER_CODE } = require('./disconnect_status_codes');
 
@@ -140,7 +140,7 @@ class PeerPool extends EventEmitter {
       this.emit(EVENT_CONNECT_ABORT_OUTBOUND, peerInfo);
     };
     this._handlePeerCloseOutbound = (closePacket) => {
-      const peerId = constructPeerIdFromPeerInfo(closePacket.peerInfo);
+      const peerId = getPeerIdFromPeerInfo(closePacket.peerInfo);
       this.removeOutboundPeer(
         peerId,
         closePacket.code,
@@ -152,7 +152,7 @@ class PeerPool extends EventEmitter {
       this.emit(EVENT_CLOSE_OUTBOUND, closePacket);
     };
     this._handlePeerCloseInbound = (closePacket) => {
-      const peerId = constructPeerIdFromPeerInfo(closePacket.peerInfo);
+      const peerId = getPeerIdFromPeerInfo(closePacket.peerInfo);
       this.removeInboundPeer(
         peerId,
         closePacket.code,
@@ -245,7 +245,7 @@ class PeerPool extends EventEmitter {
       );
     }
 
-    const selectedPeerId = constructPeerIdFromPeerInfo(selectedPeers[0]);
+    const selectedPeerId = getPeerIdFromPeerInfo(selectedPeers[0]);
 
     return this.requestFromPeer(packet, selectedPeerId);
   }
@@ -272,7 +272,7 @@ class PeerPool extends EventEmitter {
     });
 
     selectedPeers.forEach((peerInfo) => {
-      const selectedPeerId = constructPeerIdFromPeerInfo(peerInfo);
+      const selectedPeerId = getPeerIdFromPeerInfo(peerInfo);
       try {
         this.sendToPeer(packet, selectedPeerId);
       } catch (error) {
@@ -310,14 +310,14 @@ class PeerPool extends EventEmitter {
     // Try to connect to disconnected peers without including the fixed ones which are specially treated thereafter
     const disconnectedNewPeers = newPeers.filter(
       newPeer =>
-        !this._outboundPeerMap.has(constructPeerIdFromPeerInfo(newPeer)) &&
+        !this._outboundPeerMap.has(getPeerIdFromPeerInfo(newPeer)) &&
         !fixedPeers
           .map(fixedPeer => fixedPeer.ipAddress)
           .includes(newPeer.ipAddress),
     );
     const disconnectedTriedPeers = triedPeers.filter(
       triedPeer =>
-        !this._outboundPeerMap.has(constructPeerIdFromPeerInfo(triedPeer)) &&
+        !this._outboundPeerMap.has(getPeerIdFromPeerInfo(triedPeer)) &&
         !fixedPeers
           .map(fixedPeer => fixedPeer.ipAddress)
           .includes(triedPeer.ipAddress),
@@ -325,22 +325,22 @@ class PeerPool extends EventEmitter {
 
     const mapToConnectedPeerInfo = (peerInfo) => {
       return {
-        kind: this._outboundPeerMap.get(constructPeerIdFromPeerInfo(peerInfo)).kind,
+        kind: this._outboundPeerMap.get(getPeerIdFromPeerInfo(peerInfo)).kind,
         ...peerInfo
       };
     };
 
     const connectedNewPeers = newPeers
-      .filter(newPeer => this._outboundPeerMap.has(constructPeerIdFromPeerInfo(newPeer)))
+      .filter(newPeer => this._outboundPeerMap.has(getPeerIdFromPeerInfo(newPeer)))
       .map(mapToConnectedPeerInfo);
 
     const connectedTriedPeers = triedPeers
-      .filter(triedPeer => this._outboundPeerMap.has(constructPeerIdFromPeerInfo(triedPeer)))
+      .filter(triedPeer => this._outboundPeerMap.has(getPeerIdFromPeerInfo(triedPeer)))
       .map(mapToConnectedPeerInfo);
 
     const { outboundCount, inboundCount } = this.getPeersCountPerKind();
     const disconnectedFixedPeers = fixedPeers
-      .filter(peer => !this._outboundPeerMap.get(constructPeerIdFromPeerInfo(peer)));
+      .filter(peer => !this._outboundPeerMap.get(getPeerIdFromPeerInfo(peer)));
 
     // This function can be customized so we should pass as much info as possible.
     const peersToConnect = this._peerSelectForConnection({
@@ -357,7 +357,7 @@ class PeerPool extends EventEmitter {
 
     [...peersToConnect, ...disconnectedFixedPeers].forEach(
       (peerInfo) => {
-        const peerId = constructPeerIdFromPeerInfo(peerInfo);
+        const peerId = getPeerIdFromPeerInfo(peerInfo);
         return this.addOutboundPeer(peerId, peerInfo);
       },
     );
@@ -555,7 +555,7 @@ class PeerPool extends EventEmitter {
   _selectPeersForEviction() {
     const peers = [...this.getPeers(PEER_KIND_INBOUND)].filter(peer =>
       this._peerLists.whitelisted.every(
-        p => constructPeerIdFromPeerInfo(p) !== peer.id,
+        p => getPeerIdFromPeerInfo(p) !== peer.id,
       ),
     );
 
@@ -607,7 +607,7 @@ class PeerPool extends EventEmitter {
       const selectedPeer = shuffle(
         peers.filter(peer =>
           this._peerLists.fixedPeers.every(
-            p => constructPeerIdFromPeerInfo(p) !== peer.id,
+            p => getPeerIdFromPeerInfo(p) !== peer.id,
           ),
         ),
       )[0];

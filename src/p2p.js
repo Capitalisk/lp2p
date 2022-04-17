@@ -72,7 +72,7 @@ const {
   PeerPool,
 } = require('./peer_pool');
 const {
-  constructPeerIdFromPeerInfo,
+  getPeerIdFromPeerInfo,
   getHostFromPeerId,
   getPortFromPeerId,
   normalizeAddress,
@@ -188,9 +188,9 @@ class P2P extends EventEmitter {
     };
 
     this._handleOutboundPeerConnectAbort = (peerInfo) => {
-      const peerId = constructPeerIdFromPeerInfo(peerInfo);
+      const peerId = getPeerIdFromPeerInfo(peerInfo);
       const isWhitelisted = this._sanitizedPeerLists.whitelisted.find(
-        peer => constructPeerIdFromPeerInfo(peer) === peerId,
+        peer => getPeerIdFromPeerInfo(peer) === peerId,
       );
       if (this._peerBook.getPeer(peerInfo) && !isWhitelisted) {
         this._peerBook.downgradePeer(peerInfo);
@@ -263,7 +263,7 @@ class P2P extends EventEmitter {
       const peerPort = getPortFromPeerId(peerId);
       this._bannedPeers.add(peerHost);
       const isWhitelisted = this._sanitizedPeerLists.whitelisted.find(
-        peer => constructPeerIdFromPeerInfo(peer) === peerId,
+        peer => getPeerIdFromPeerInfo(peer) === peerId,
       );
 
       const bannedPeerInfo = {
@@ -287,10 +287,10 @@ class P2P extends EventEmitter {
 
     // When peer is fetched for status after connection then update the peerinfo in triedPeer list
     this._handleDiscoveredPeer = (detailedPeerInfo) => {
-      const peerId = constructPeerIdFromPeerInfo(detailedPeerInfo);
+      const peerId = getPeerIdFromPeerInfo(detailedPeerInfo);
       // Check blacklist to avoid incoming connections from backlisted ips
       const isBlacklisted = this._sanitizedPeerLists.blacklistedPeers.find(
-        peer => constructPeerIdFromPeerInfo(peer) === peerId,
+        peer => getPeerIdFromPeerInfo(peer) === peerId,
       );
 
       if (!this._peerBook.getPeer(detailedPeerInfo) && !isBlacklisted) {
@@ -477,10 +477,10 @@ class P2P extends EventEmitter {
     const allPeers = this._peerBook.getAllPeers();
     const connectedPeers = this.getConnectedPeers();
     const connectedPeerIdSet = new Set(
-      connectedPeers.map(peerInfo => constructPeerIdFromPeerInfo(peerInfo))
+      connectedPeers.map(peerInfo => getPeerIdFromPeerInfo(peerInfo))
     );
     const disconnectedPeers = allPeers.filter(peerInfo => {
-      const peerId = constructPeerIdFromPeerInfo(peerInfo);
+      const peerId = getPeerIdFromPeerInfo(peerInfo);
       return !connectedPeerIdSet.has(peerId);
     });
 
@@ -593,7 +593,7 @@ class P2P extends EventEmitter {
         } else {
           wsPort = parseInt(queryObject.wsPort, BASE_10_RADIX);
         }
-        const peerId = constructPeerIdFromPeerInfo({
+        const peerId = getPeerIdFromPeerInfo({
           ipAddress: socket.remoteAddress,
           wsPort,
         });
@@ -795,18 +795,18 @@ class P2P extends EventEmitter {
     const isSeed = this._sanitizedPeerLists.seedPeers.find(
       seedPeer =>
         peerId ===
-        constructPeerIdFromPeerInfo({
+        getPeerIdFromPeerInfo({
           ipAddress: seedPeer.ipAddress,
           wsPort: seedPeer.wsPort,
         }),
     );
 
     const isWhitelisted = this._sanitizedPeerLists.whitelisted.find(
-      peer => constructPeerIdFromPeerInfo(peer) === peerId,
+      peer => getPeerIdFromPeerInfo(peer) === peerId,
     );
 
     const isFixed = this._sanitizedPeerLists.fixedPeers.find(
-      peer => constructPeerIdFromPeerInfo(peer) === peerId,
+      peer => getPeerIdFromPeerInfo(peer) === peerId,
     );
 
     return !!isSeed || !!isWhitelisted || !!isFixed;

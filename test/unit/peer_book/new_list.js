@@ -18,7 +18,7 @@ const {
   initializePeerInfoList,
   initializePeerInfoListWithSuffix,
 } = require('../../utils/peers');
-const { PEER_TYPE, constructPeerIdFromPeerInfo } = require('../../../src/utils');
+const { PEER_TYPE, getPeerIdFromPeerInfo } = require('../../../src/utils');
 const {
   DEFAULT_NEW_BUCKET_COUNT,
   DEFAULT_NEW_BUCKET_SIZE,
@@ -284,12 +284,12 @@ describe('newPeer', () => {
     peerDate.setMilliseconds(peerDate.getMilliseconds() + 11000);
     const oldPeer = { peerInfo: samplePeers[0], dateAdded: peerDate };
     // Now set 2 peer with one peer staying in a bucket for longer than 10 seconds
-    newPeerMapCustom.set(constructPeerIdFromPeerInfo(samplePeers[0]), oldPeer);
-    newPeerMapCustom.set(constructPeerIdFromPeerInfo(samplePeers[1]), {
+    newPeerMapCustom.set(getPeerIdFromPeerInfo(samplePeers[0]), oldPeer);
+    newPeerMapCustom.set(getPeerIdFromPeerInfo(samplePeers[1]), {
       peerInfo: samplePeers[1],
       dateAdded: new Date(),
     });
-    newPeerMapCustom.set(constructPeerIdFromPeerInfo(samplePeers[2]), {
+    newPeerMapCustom.set(getPeerIdFromPeerInfo(samplePeers[2]), {
       peerInfo: samplePeers[2],
       dateAdded: new Date(),
     });

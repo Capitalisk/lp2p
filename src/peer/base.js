@@ -22,7 +22,7 @@ const {
 } = require('../disconnect_status_codes');
 const { RPCResponseError } = require('../errors');
 const { P2PRequest } = require('../p2p_request');
-const { constructPeerIdFromPeerInfo } = require('../utils');
+const { getPeerIdFromPeerInfo } = require('../utils');
 
 const {
   validatePeerInfo,
@@ -96,7 +96,7 @@ class Peer extends EventEmitter {
     this._peerConfig = peerConfig;
     this._ipAddress = peerInfo.ipAddress;
     this._wsPort = peerInfo.wsPort;
-    this._id = constructPeerIdFromPeerInfo({
+    this._id = getPeerIdFromPeerInfo({
       ipAddress: this._ipAddress,
       wsPort: this._wsPort,
     });
