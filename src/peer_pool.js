@@ -63,7 +63,6 @@ const INTENTIONAL_DISCONNECT_STATUS_CODE = 1000;
 const EVENT_FAILED_TO_SEND_MESSAGE = 'failedToSendMessage';
 
 const PROTECTION_CATEGORY = {
-  NET_GROUP: 'netgroup',
   LATENCY: 'latency',
   RESPONSE_RATE: 'responseRate',
   CONNECT_TIME: 'connectTime'
@@ -559,18 +558,6 @@ class PeerPool extends EventEmitter {
         p => constructPeerIdFromPeerInfo(p) !== peer.id,
       ),
     );
-
-    // Cannot predict which netgroups will be protected
-    const filteredPeersByNetgroup = this._peerPoolConfig.netgroupProtectionRatio
-      ? filterPeersByCategory(peers, {
-          category: PROTECTION_CATEGORY.NET_GROUP,
-          percentage: this._peerPoolConfig.netgroupProtectionRatio,
-          asc: true,
-        })
-      : peers;
-    if (filteredPeersByNetgroup.length <= 1) {
-      return filteredPeersByNetgroup;
-    }
 
     // Cannot manipulate without physically moving nodes closer to the target.
     const filteredPeersByLatency = this._peerPoolConfig.latencyProtectionRatio

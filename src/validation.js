@@ -27,14 +27,12 @@ const {
 } = require('./disconnect_status_codes');
 const { constructPeerIdFromPeerInfo } = require('./utils');
 
-const IPV4_NUMBER = 4;
-
 const getByteSize = (object) =>
   Buffer.byteLength(JSON.stringify(object));
 
 const validatePeerAddress = (ip, wsPort) => {
   if (
-    !isIP(ip, IPV4_NUMBER) ||
+    !isIP(ip) ||
     !isPort(wsPort.toString())
   ) {
     return false;
@@ -215,10 +213,6 @@ const sanitizePeerLists = (lists, nodeInfo) => {
   const blacklistedIPs = blacklistedPeers.map(peerInfo => peerInfo.ipAddress);
 
   const seedPeers = lists.seedPeers.filter(peerInfo => {
-    if (peerInfo.ipAddress === nodeInfo.ipAddress) {
-      return false;
-    }
-
     if (blacklistedIPs.includes(peerInfo.ipAddress)) {
       return false;
     }

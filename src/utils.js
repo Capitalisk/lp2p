@@ -13,21 +13,28 @@
  *
  */
 const crypto = require('crypto');
-const { isIPv4 } = require('net');
+const { isIPv4, isIPv6 } = require('net');
 
 const SECRET_BUFFER_LENGTH = 4;
 const NETWORK_BUFFER_LENGTH = 1;
 const PREFIX_BUFFER_LENGTH = 1;
+const BYTES_2 = 2;
 const BYTES_4 = 4;
 const BYTES_16 = 16;
 const BYTES_64 = 64;
 const BYTES_128 = 128;
 
+const IPV6_UNCOMPRESSED_PART_LENGTH = 4;
+const IPV6_UNCOMPRESSED_COLON_COUNT = 7;
+const COLON_REGEX = /:/g;
+const DOUBLE_COLON_REGEX = /::/g;
+
 const NETWORK = {
   NET_IPV4: 0,
-  NET_PRIVATE: 1,
-  NET_LOCAL: 2,
-  NET_OTHER: 3,
+  NET_IPV6: 1,
+  NET_PRIVATE: 2,
+  NET_LOCAL: 3,
+  NET_OTHER: 4,
 };
 
 const PEER_TYPE = {
@@ -41,41 +48,44 @@ const hash = (data) => {
   return dataHash.digest();
 };
 
-const getIPGroup = (address, groupNumber) => {
-  if (groupNumber > 3) {
-    throw new Error('Invalid IP group.');
+const normalizeIPv6Address = (ipv6Address) => {
+  const colonCount = (ipv6Address.match(COLON_REGEX) || []).length;
+  const colonDiff = IPV6_UNCOMPRESSED_COLON_COUNT - colonCount;
+  const fullColonAddress = ipv6Address.replace(DOUBLE_COLON_REGEX, `::${':'.repeat(colonDiff)}`);
+  return fullColonAddress.split(':')
+    .map((part) => {
+      if (part === '') {
+        return '0';
+      }
+      return parseInt(part, 16).toString(16);
+    })
+    .join(':');
+};
+
+const isPrivate = (address) => {
+  if (isIPv4(address)) {
+    const addressParts = address.split('.');
+    const addressFirstNumber = parseInt(addressParts[0]);
+    const addressSecondNumber = parseInt(addressParts[1]);
+
+    return addressFirstNumber === 10 ||
+      (addressFirstNumber === 172 &&
+      addressSecondNumber >= 16 && addressSecondNumber <= 31);
   }
-
-  return parseInt(address.split('.')[groupNumber], 10);
+  const firstAddressPart = address.split(':')[0];
+  const addressPrefix = firstAddressPart.slice(0, 2);
+  return addressPrefix === 'fc' || addressPrefix === 'fd';
 };
 
-// Each byte represents the corresponding subsection of the IP address e.g. AAA.BBB.CCC.DDD
-const getIPBytes = (address) => {
-  const aBytes = Buffer.alloc(PREFIX_BUFFER_LENGTH);
-  aBytes.fill(getIPGroup(address, 0), 0);
-  const bBytes = Buffer.alloc(PREFIX_BUFFER_LENGTH);
-  bBytes.fill(getIPGroup(address, 1), 0);
-  const cBytes = Buffer.alloc(PREFIX_BUFFER_LENGTH);
-  cBytes.fill(getIPGroup(address, 2), 0);
-  const dBytes = Buffer.alloc(PREFIX_BUFFER_LENGTH);
-  dBytes.fill(getIPGroup(address, 3), 0);
+const isLocal = (address) => {
+  if (isIPv4(address)) {
+    const addressParts = address.split('.');
+    const addressFirstNumber = parseInt(addressParts[0]);
 
-  return {
-    aBytes,
-    bBytes,
-    cBytes,
-    dBytes,
-  };
-};
-
-const isPrivate = (address) =>
-  getIPGroup(address, 0) === 10 ||
-  (getIPGroup(address, 0) === 172 &&
-    (getIPGroup(address, 1) >= 16 || getIPGroup(address, 1) <= 31));
-
-const isLocal = (address) =>
-  getIPGroup(address, 0) === 127 || getIPGroup(address, 0) === 0;
-/* tslint:enable no-magic-numbers */
+    return addressFirstNumber === 127 || addressFirstNumber === 0;
+  }
+  return normalizeIPv6Address(address) === '0:0:0:0:0:0:0:1';
+}
 
 const getNetwork = (address) => {
   if (isLocal(address)) {
@@ -90,99 +100,61 @@ const getNetwork = (address) => {
     return NETWORK.NET_IPV4;
   }
 
+  if (isIPv6(address)) {
+    return NETWORK.NET_IPV6;
+  }
+
   return NETWORK.NET_OTHER;
 };
 
-const getNetgroup = (address, secret) => {
-  const secretBytes = Buffer.alloc(SECRET_BUFFER_LENGTH);
-  secretBytes.writeUInt32BE(secret, 0);
-  const network = getNetwork(address);
-  const networkBytes = Buffer.alloc(NETWORK_BUFFER_LENGTH);
-  networkBytes.writeUInt8(network, 0);
+const getIPv6Bytes = (ipv6Address) => {
+  const normalizedAddress = normalizeIPv6Address(ipv6Address);
+  const addressBuffers = normalizedAddress.split(':').map((part) => {
+    const lengthDiff = IPV6_UNCOMPRESSED_PART_LENGTH - part.length;
+    const uncompressedPart = `${'0'.repeat(lengthDiff)}${part}`;
+    return Buffer.from(uncompressedPart, 'hex');
+  });
+  return Buffer.concat(addressBuffers);
+};
 
-  // Get prefix bytes of ip address to bucket
-  const { aBytes, bBytes } = getIPBytes(address);
-
-  // Check if ip address is unsupported network type
-  if (network === NETWORK.NET_OTHER) {
-    throw Error('IP address is unsupported.');
-  }
-
-  const netgroupBytes = Buffer.concat([
-    secretBytes,
-    networkBytes,
-    aBytes,
-    bBytes,
-  ]);
-
-  return hash(netgroupBytes).readUInt32BE(0);
+const getIPv4Bytes = (ipv4Address) => {
+  const addressBuffers = ipv4Address.split('.').map((part) => {
+    const partBuffer = Buffer.alloc(1);
+    partBuffer.writeUInt8(parseInt(part));
+    return partBuffer;
+  });
+  return Buffer.concat(addressBuffers);
 };
 
 const getBucketId = (options) => {
   const { secret, targetAddress, peerType, bucketCount } = options;
-  const firstMod = peerType === PEER_TYPE.NEW_PEER ? BYTES_16 : BYTES_4;
+
   const secretBytes = Buffer.alloc(SECRET_BUFFER_LENGTH);
   secretBytes.writeUInt32BE(secret, 0);
+
   const network = getNetwork(targetAddress);
-  const networkBytes = Buffer.alloc(NETWORK_BUFFER_LENGTH);
-  networkBytes.writeUInt8(network, 0);
 
-  // Get bytes of ip address to bucket
-  const {
-    aBytes: targetABytes,
-    bBytes: targetBBytes,
-    cBytes: targetCBytes,
-    dBytes: targetDBytes,
-  } = getIPBytes(targetAddress);
-
-  // Check if ip address is unsupported network type
   if (network === NETWORK.NET_OTHER) {
     throw Error('IP address is unsupported.');
   }
 
-  // Seperate buckets for local and private addresses
-  if (network !== NETWORK.NET_IPV4) {
+  const networkBytes = Buffer.alloc(NETWORK_BUFFER_LENGTH);
+  networkBytes.writeUInt8(network, 0);
+
+  if (network === NETWORK.NET_LOCAL || network === NETWORK.NET_PRIVATE) {
     return (
       hash(Buffer.concat([secretBytes, networkBytes])).readUInt32BE(0) %
       bucketCount
     );
   }
 
-  const addressBytes = Buffer.concat([
-    targetABytes,
-    targetBBytes,
-    targetCBytes,
-    targetDBytes,
-  ]);
+  const addressBytes = network === NETWORK.NET_IPV6 ?
+    getIPv6Bytes(targetAddress) : getIPv4Bytes(targetAddress);
 
-  // New peers: k = Hash(random_secret, source_group, group) % 16
-  // Tried peers: k = Hash(random_secret, IP) % 4
-  const kBytes = Buffer.alloc(firstMod);
-
-  const k =
-    peerType === PEER_TYPE.NEW_PEER
-      ? hash(
-          Buffer.concat([
-            secretBytes,
-            networkBytes,
-            targetABytes,
-            targetBBytes,
-          ]),
-        ).readUInt32BE(0) % firstMod
-      : hash(
-          Buffer.concat([secretBytes, networkBytes, addressBytes]),
-        ).readUInt32BE(0) % firstMod;
-
-  kBytes.writeUInt32BE(k, 0);
-
-  // New peers: b = Hash(random_secret, source_group, k) % 128
-  // Tried peers: b = Hash(random_secret, group, k) % 64
   const bucketBytes = Buffer.concat([
     secretBytes,
     networkBytes,
-    targetABytes,
-    targetBBytes,
-    kBytes,
+    addressBytes,
   ]);
 
   return hash(bucketBytes).readUInt32BE(0) % bucketCount;
@@ -194,12 +166,9 @@ const constructPeerIdFromPeerInfo = (peerInfo) =>
 module.exports = {
   PEER_TYPE,
   hash,
-  getIPGroup,
-  getIPBytes,
   isPrivate,
   isLocal,
   getNetwork,
-  getNetgroup,
   getBucketId,
   constructPeerIdFromPeerInfo,
 };

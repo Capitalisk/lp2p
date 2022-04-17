@@ -22,7 +22,7 @@ const {
 } = require('../disconnect_status_codes');
 const { RPCResponseError } = require('../errors');
 const { P2PRequest } = require('../p2p_request');
-const { constructPeerIdFromPeerInfo, getNetgroup } = require('../utils');
+const { constructPeerIdFromPeerInfo } = require('../utils');
 
 const {
   validatePeerInfo,
@@ -103,7 +103,6 @@ class Peer extends EventEmitter {
     this._active = true;
     this._height = peerInfo.height ? peerInfo.height : 0;
     this._reputation = DEFAULT_REPUTATION_SCORE;
-    this._netgroup = getNetgroup(this._ipAddress, peerConfig.secret);
     this._latency = 0;
     this._connectTime = Date.now();
     this._rpcCounter = new Map();
@@ -261,10 +260,6 @@ class Peer extends EventEmitter {
 
   get reputation() {
     return this._reputation;
-  }
-
-  get netgroup() {
-    return this._netgroup;
   }
 
   get latency() {

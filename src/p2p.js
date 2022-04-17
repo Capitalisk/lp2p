@@ -83,7 +83,7 @@ const EVENT_FAILED_TO_ADD_INBOUND_PEER = 'failedToAddInboundPeer';
 const EVENT_NEW_PEER = 'newPeer';
 const EVENT_NETWORK_READY = 'networkReady';
 
-const DEFAULT_NODE_HOST_IP = '0.0.0.0';
+const DEFAULT_NODE_HOST_IP = '::1';
 const DEFAULT_DISCOVERY_INTERVAL = 30000;
 const DEFAULT_BAN_TIME = 86400;
 const DEFAULT_POPULATOR_INTERVAL = 10000;
@@ -99,7 +99,6 @@ const BASE_10_RADIX = 10;
 const DEFAULT_MAX_OUTBOUND_CONNECTIONS = 20;
 const DEFAULT_MAX_INBOUND_CONNECTIONS = 100;
 const DEFAULT_OUTBOUND_SHUFFLE_INTERVAL = 300000;
-const DEFAULT_PEER_PROTECTION_FOR_NETGROUP = 0.034;
 const DEFAULT_PEER_PROTECTION_FOR_LATENCY = 0.068;
 const DEFAULT_PEER_PROTECTION_FOR_USEFULNESS = 0.068;
 const DEFAULT_PEER_PROTECTION_FOR_LONGEVITY = 0.5;
@@ -369,10 +368,6 @@ class P2P extends EventEmitter {
       outboundShuffleInterval: config.outboundShuffleInterval
         ? config.outboundShuffleInterval
         : DEFAULT_OUTBOUND_SHUFFLE_INTERVAL,
-      netgroupProtectionRatio:
-        typeof config.netgroupProtectionRatio === 'number'
-          ? config.netgroupProtectionRatio
-          : DEFAULT_PEER_PROTECTION_FOR_NETGROUP,
       latencyProtectionRatio:
         typeof config.latencyProtectionRatio === 'number'
           ? config.latencyProtectionRatio
@@ -912,7 +907,6 @@ module.exports = {
   DEFAULT_MAX_OUTBOUND_CONNECTIONS,
   DEFAULT_MAX_INBOUND_CONNECTIONS,
   DEFAULT_OUTBOUND_SHUFFLE_INTERVAL,
-  DEFAULT_PEER_PROTECTION_FOR_NETGROUP,
   DEFAULT_PEER_PROTECTION_FOR_LATENCY,
   DEFAULT_PEER_PROTECTION_FOR_USEFULNESS,
   DEFAULT_PEER_PROTECTION_FOR_LONGEVITY,
