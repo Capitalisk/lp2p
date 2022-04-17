@@ -1917,7 +1917,7 @@ describe('Integration tests for P2P library', () => {
       });
 
       await Promise.all(p2pNodeList.map(async p2p => await p2p.start()));
-      await wait(2000);
+      await wait(3000);
     });
 
     afterEach(async () => {
