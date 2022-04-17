@@ -70,8 +70,8 @@ const getIPBytes = (address) => {
 
 const isPrivate = (address) =>
   getIPGroup(address, 0) === 10 ||
-  (getIPGroup(address, 0) === 172 &&
-    (getIPGroup(address, 1) >= 16 || getIPGroup(address, 1) <= 31));
+    (getIPGroup(address, 0) === 172 &&
+      getIPGroup(address, 1) >= 16 && getIPGroup(address, 1) <= 31);
 
 const isLocal = (address) =>
   getIPGroup(address, 0) === 127 || getIPGroup(address, 0) === 0;
