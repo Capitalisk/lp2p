@@ -30,7 +30,9 @@ const COLON_REGEX = /:/g;
 const DOUBLE_COLON_REGEX = /::/g;
 
 const IPV6_PEER_HOST_REGEX = /\[([^\[]*)\]/;
-const IPV6_PEER_PORT_REGEX = /\[[^\[]*\]:([^:]*)/;
+const IPV6_PEER_PORT_REGEX = /\[[^\[]*\]:([^:]*)$/;
+
+const IPV6_HYBRID_REGEX = /ffff:([0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3})$/;
 
 const NETWORK = {
   NET_IPV4: 0,
@@ -63,6 +65,30 @@ const normalizeIPv6Address = (ipv6Address) => {
       return parseInt(part, 16).toString(16);
     })
     .join(':');
+};
+
+const normalizeAddress = (address) => {
+  let protocolVersion;
+  if (isIPv6(address)) {
+    const nestedIPV4Matches = address.match(IPV6_HYBRID_REGEX);
+    if (nestedIPV4Matches) {
+      protocolVersion = 4;
+      return {
+        protocolVersion,
+        address: nestedIPV4Matches[1],
+      };
+    }
+    protocolVersion = 6;
+    return {
+      protocolVersion,
+      address: normalizeIPv6Address(address),
+    };
+  }
+  protocolVersion = 4;
+  return {
+    protocolVersion,
+    address
+  };
 };
 
 const isPrivate = (address) => {
@@ -164,27 +190,38 @@ const getBucketId = (options) => {
 };
 
 const constructPeerIdFromPeerInfo = (peerInfo) => {
-  if (isIPv6(peerInfo.ipAddress)) {
-    return `[${peerInfo.ipAddress}]:${peerInfo.wsPort}`;
+  const { protocolVersion, address } = normalizeAddress(peerInfo.ipAddress);
+  if (protocolVersion === 6) {
+    return `[${address}]:${peerInfo.wsPort}`;
   }
-  return `${peerInfo.ipAddress}:${peerInfo.wsPort}`;
+  return `${address}:${peerInfo.wsPort}`;
 };
 
 const getHostFromPeerId = (peerId) => {
-  let peerIpv6Host = (peerId.match(IPV6_PEER_HOST_REGEX) || [])[1];
-  if (peerIpv6Host) {
-    return peerIpv6Host;
+  let peerIPV6Host = (peerId.match(IPV6_PEER_HOST_REGEX) || [])[1];
+  if (peerIPV6Host) {
+    const { address } = normalizeAddress(peerIPV6Host);
+    return address;
   }
   return peerId.split(':')[0];
 };
 
 const getPortFromPeerId = (peerId) => {
-  let peerIpv6Port = (peerId.match(IPV6_PEER_PORT_REGEX) || [])[1];
-  if (peerIpv6Port) {
-    return parseInt(peerIpv6Port);
+  let peerIPV6Port = (peerId.match(IPV6_PEER_PORT_REGEX) || [])[1];
+  if (peerIPV6Port) {
+    return parseInt(peerIPV6Port);
   }
   return parseInt(peerId.split(':')[1]);
 };
+
+const normalizePeerId = (peerId) => {
+  const host = getHostFromPeerId(peerId);
+  const port = getPortFromPeerId(peerId);
+  if (isIPv4(host)) {
+    return `${host}:${port}`;
+  }
+  return `[${host}]:${port}`;
+}
 
 module.exports = {
   PEER_TYPE,
@@ -196,4 +233,6 @@ module.exports = {
   constructPeerIdFromPeerInfo,
   getHostFromPeerId,
   getPortFromPeerId,
+  normalizeAddress,
+  normalizePeerId,
 };

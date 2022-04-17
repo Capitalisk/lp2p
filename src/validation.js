@@ -25,7 +25,7 @@ const {
   INCOMPATIBLE_NETWORK_REASON,
   INCOMPATIBLE_PROTOCOL_VERSION_REASON,
 } = require('./disconnect_status_codes');
-const { constructPeerIdFromPeerInfo } = require('./utils');
+const { constructPeerIdFromPeerInfo, normalizeAddress } = require('./utils');
 
 const getByteSize = (object) =>
   Buffer.byteLength(JSON.stringify(object));
@@ -201,58 +201,74 @@ const checkPeerCompatibility = (peerInfo, nodeInfo) => {
   };
 };
 
+const sanitizePeerInfo = (peerInfo) => {
+  const { ipAddress, ...remainingPeerInfo } = peerInfo;
+  return {
+    ipAddress: normalizeAddress(ipAddress).address,
+    ...remainingPeerInfo,
+  };
+};
+
 const sanitizePeerLists = (lists, nodeInfo) => {
   const blacklistedPeers = [...lists.blacklistedPeers];
 
   const blacklistedIPs = blacklistedPeers.map(peerInfo => peerInfo.ipAddress);
 
-  const seedPeers = lists.seedPeers.filter(peerInfo => {
-    if (blacklistedIPs.includes(peerInfo.ipAddress)) {
-      return false;
-    }
+  const seedPeers = lists.seedPeers
+    .map(sanitizePeerInfo)
+    .filter(peerInfo => {
+      if (blacklistedIPs.includes(peerInfo.ipAddress)) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
 
-  const fixedPeers = lists.fixedPeers.filter(peerInfo => {
-    if (blacklistedIPs.includes(peerInfo.ipAddress)) {
-      return false;
-    }
+  const fixedPeers = lists.fixedPeers
+    .map(sanitizePeerInfo)
+    .filter(peerInfo => {
+      if (blacklistedIPs.includes(peerInfo.ipAddress)) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
 
-  const whitelisted = lists.whitelisted.filter(peerInfo => {
-    if (blacklistedIPs.includes(peerInfo.ipAddress)) {
-      return false;
-    }
+  const whitelisted = lists.whitelisted
+    .map(sanitizePeerInfo)
+    .filter(peerInfo => {
+      if (blacklistedIPs.includes(peerInfo.ipAddress)) {
+        return false;
+      }
 
-    if (
-      fixedPeers
-        .map(constructPeerIdFromPeerInfo)
-        .includes(constructPeerIdFromPeerInfo(peerInfo))
-    ) {
-      return false;
-    }
+      if (
+        fixedPeers
+          .map(constructPeerIdFromPeerInfo)
+          .includes(constructPeerIdFromPeerInfo(peerInfo))
+      ) {
+        return false;
+      }
 
-    if (
-      seedPeers
-        .map(constructPeerIdFromPeerInfo)
-        .includes(constructPeerIdFromPeerInfo(peerInfo))
-    ) {
-      return false;
-    }
+      if (
+        seedPeers
+          .map(constructPeerIdFromPeerInfo)
+          .includes(constructPeerIdFromPeerInfo(peerInfo))
+      ) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
 
-  const previousPeers = lists.previousPeers.filter(peerInfo => {
-    if (blacklistedIPs.includes(peerInfo.ipAddress)) {
-      return false;
-    }
+  const previousPeers = lists.previousPeers
+    .map(sanitizePeerInfo)
+    .filter(peerInfo => {
+      if (blacklistedIPs.includes(peerInfo.ipAddress)) {
+        return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
 
   return {
     blacklistedPeers,

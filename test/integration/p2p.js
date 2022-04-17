@@ -663,7 +663,7 @@ describe('Integration tests for P2P library', () => {
           .which.is.equal('test');
         expect(collectedMessages[0].message)
           .to.have.property('peerId')
-          .which.is.equal(`[::1]:${NETWORK_START_PORT}`);
+          .which.is.equal(`[0:0:0:0:0:0:0:1]:${NETWORK_START_PORT}`);
       });
     });
 
@@ -1108,7 +1108,7 @@ describe('Integration tests for P2P library', () => {
 
         await wait(200);
 
-        expect(removedPeers).to.contain('[::1]:5000');
+        expect(removedPeers).to.contain('[0:0:0:0:0:0:0:1]:5000');
       });
     });
 
@@ -1199,7 +1199,7 @@ describe('Integration tests for P2P library', () => {
 
         await wait(200);
 
-        expect(removedPeers).to.contain('[::1]:5002');
+        expect(removedPeers).to.contain('[0:0:0:0:0:0:0:1]:5002');
       });
     });
   });
@@ -1637,7 +1637,7 @@ describe('Integration tests for P2P library', () => {
           .which.is.equal('bar');
         expect(response.data)
           .to.have.property('requestPeerId')
-          .which.is.equal(`[::1]:${secondP2PNode.nodeInfo.wsPort}`);
+          .which.is.equal(`[0:0:0:0:0:0:0:1]:${secondP2PNode.nodeInfo.wsPort}`);
       });
 
       // Check for even distribution of requests across the network. Account for an error margin.
@@ -1983,7 +1983,7 @@ describe('Integration tests for P2P library', () => {
           data: dataLargerThanMaxPayload,
         });
 
-        await wait(2000);
+        await wait(3000);
 
         const firstPeerDisconnectedList =
           closedPeers.get(firstP2PNode.nodeInfo.wsPort) || [];

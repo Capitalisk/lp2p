@@ -71,7 +71,13 @@ const {
   EVENT_UPDATED_PEER_INFO,
   PeerPool,
 } = require('./peer_pool');
-const { constructPeerIdFromPeerInfo, getHostFromPeerId, getPortFromPeerId } = require('./utils');
+const {
+  constructPeerIdFromPeerInfo,
+  getHostFromPeerId,
+  getPortFromPeerId,
+  normalizeAddress,
+  normalizePeerId,
+} = require('./utils');
 const {
   checkPeerCompatibility,
   outgoingPeerInfoSanitization,
@@ -450,8 +456,12 @@ class P2P extends EventEmitter {
   }
 
   applyPenalty(peerPenalty) {
-    if (!this._isTrustedPeer(peerPenalty.peerId)) {
-      this._peerPool.applyPenalty(peerPenalty);
+    const normalizedPeerPenalty = {
+      peerId: normalizePeerId(peerPenalty.peerId),
+      ...peerPenalty,
+    };
+    if (!this._isTrustedPeer(normalizedPeerPenalty)) {
+      this._peerPool.applyPenalty(normalizedPeerPenalty);
     }
   }
 
@@ -488,11 +498,13 @@ class P2P extends EventEmitter {
   }
 
   async requestFromPeer(packet, peerId) {
-    return this._peerPool.requestFromPeer(packet, peerId);
+    const normalizedPeerId = normalizePeerId(peerId);
+    return this._peerPool.requestFromPeer(packet, normalizedPeerId);
   }
 
   sendToPeer(message, peerId) {
-    this._peerPool.sendToPeer(message, peerId);
+    const normalizedPeerId = normalizePeerId(peerId);
+    this._peerPool.sendToPeer(message, normalizedPeerId);
   }
 
   _disconnectSocketDueToFailedHandshake(socket, statusCode, closeReason) {
@@ -502,7 +514,7 @@ class P2P extends EventEmitter {
       new PeerInboundHandshakeError(
         closeReason,
         statusCode,
-        socket.remoteAddress,
+        normalizeAddress(socket.remoteAddress).address,
         socket.request.url,
       )
     );
@@ -512,12 +524,14 @@ class P2P extends EventEmitter {
     this._scServer.on(
       'connection',
       (socket) => {
+        const normalizedRemoteAddress = normalizeAddress(socket.remoteAddress).address;
+
         // Check blacklist to avoid incoming connections from backlisted ips
         if (this._sanitizedPeerLists.blacklistedPeers) {
           const blacklist = this._sanitizedPeerLists.blacklistedPeers.map(
             peer => peer.ipAddress,
           );
-          if (blacklist.includes(socket.remoteAddress)) {
+          if (blacklist.includes(normalizedRemoteAddress)) {
             this._disconnectSocketDueToFailedHandshake(
               socket,
               FORBIDDEN_CONNECTION,
@@ -553,7 +567,7 @@ class P2P extends EventEmitter {
 
           // Delete you peerinfo from both the lists
           this._peerBook.removePeer({
-            ipAddress: socket.remoteAddress,
+            ipAddress: normalizedRemoteAddress,
             wsPort: selfWSPort,
           });
 
@@ -602,7 +616,7 @@ class P2P extends EventEmitter {
           return;
         }
 
-        if (this._bannedPeers.has(socket.remoteAddress)) {
+        if (this._bannedPeers.has(normalizedRemoteAddress)) {
           this._disconnectSocketDueToFailedHandshake(
             socket,
             FORBIDDEN_CONNECTION,
@@ -615,7 +629,7 @@ class P2P extends EventEmitter {
         const incomingPeerInfo = {
           ...queryObject,
           ...queryOptions,
-          ipAddress: socket.remoteAddress,
+          ipAddress: normalizedRemoteAddress,
           wsPort,
           height: queryObject.height ? +queryObject.height : 0,
           version: queryObject.version,
