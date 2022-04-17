@@ -1971,7 +1971,7 @@ describe('Integration tests for P2P library', () => {
           event: 'maxPayload',
           data: dataLargerThanMaxPayload,
         });
-        await wait(200);
+        await wait(500);
 
         expect(collectedMessages).to.be.empty;
       });
@@ -1983,7 +1983,7 @@ describe('Integration tests for P2P library', () => {
           data: dataLargerThanMaxPayload,
         });
 
-        await wait(3000);
+        await wait(4000);
 
         const firstPeerDisconnectedList =
           closedPeers.get(firstP2PNode.nodeInfo.wsPort) || [];
