@@ -566,7 +566,7 @@ class PeerPool extends EventEmitter {
           percentage: this._peerPoolConfig.latencyProtectionRatio,
           asc: true,
         })
-      : filteredPeersByNetgroup;
+      : peers;
     if (filteredPeersByLatency.length <= 1) {
       return filteredPeersByLatency;
     }
