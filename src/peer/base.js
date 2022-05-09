@@ -20,7 +20,7 @@ const {
   FAILED_TO_RESPOND,
   FAILED_TO_RESPOND_REASON,
 } = require('../disconnect_status_codes');
-const { RPCResponseError } = require('../errors');
+const { RPCResponseError, TimeoutError } = require('../errors');
 const { P2PRequest } = require('../p2p_request');
 const { constructPeerIdFromPeerInfo, getNetgroup } = require('../utils');
 
@@ -398,12 +398,23 @@ class Peer extends EventEmitter {
           },
           (err, responseData) => {
             if (err) {
-              reject(err);
-
               if (err.name === 'TimeoutError') {
+                reject(
+                  new TimeoutError(
+                    err.message,
+                    `${this.ipAddress}:${this.wsPort}`,
+                  )
+                );
                 setTimeout(() => {
                   this.disconnect(FAILED_TO_RESPOND, FAILED_TO_RESPOND_REASON);
                 }, 0);
+              } else {
+                reject(
+                  new RPCResponseError(
+                    err.message,
+                    `${this.ipAddress}:${this.wsPort}`,
+                  )
+                );
               }
 
               return;
