@@ -20,7 +20,7 @@ const {
   FAILED_TO_RESPOND,
   FAILED_TO_RESPOND_REASON,
 } = require('../disconnect_status_codes');
-const { RPCResponseError, TimeoutError } = require('../errors');
+const { RPCResponseError, RPCTimeoutError } = require('../errors');
 const { P2PRequest } = require('../p2p_request');
 const { constructPeerIdFromPeerInfo, getNetgroup } = require('../utils');
 
@@ -400,7 +400,7 @@ class Peer extends EventEmitter {
             if (err) {
               if (err.name === 'TimeoutError') {
                 reject(
-                  new TimeoutError(
+                  new RPCTimeoutError(
                     err.message,
                     `${this.ipAddress}:${this.wsPort}`,
                   )

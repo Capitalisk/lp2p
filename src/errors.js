@@ -44,6 +44,14 @@ class RPCResponseError extends Error {
   }
 }
 
+class RPCTimeoutError extends Error {
+  constructor(message, peerId) {
+    super(`[Peer ${peerId}] ${message}`);
+    this.name = 'RPCTimeoutError';
+    this.peerId = peerId;
+  }
+}
+
 class InvalidRPCResponseError extends Error {
   constructor(message) {
     super(message);
@@ -55,14 +63,6 @@ class RPCResponseAlreadySentError extends Error {
   constructor(message) {
     super(message);
     this.name = 'ResponseAlreadySentError';
-  }
-}
-
-class TimeoutError extends Error {
-  constructor(message, peerId) {
-    super(`[Peer ${peerId}] ${message}`);
-    this.name = 'TimeoutError';
-    this.peerId = peerId;
   }
 }
 
@@ -106,7 +106,7 @@ module.exports = {
   PeerOutboundConnectionError,
   RPCResponseError,
   InvalidRPCResponseError,
-  TimeoutError,
+  RPCTimeoutError,
   RPCResponseAlreadySentError,
   InvalidPeerError,
   RequestFailError,
