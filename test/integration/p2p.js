@@ -942,7 +942,7 @@ describe('Integration tests for P2P library', () => {
       beforeEach(async () => {
         firstP2PNode = p2pNodeList[0];
         firstPeerCloseEvents = [];
-        existingPeer = firstP2PNode['_peerPool'].getPeers('inbound')[0];
+        existingPeer = firstP2PNode['_peerPool'].getPeers('outbound')[0];
         firstPeerDuplicate = new OutboundPeer(
           existingPeer.peerInfo,
           firstP2PNode['_peerPool'].peerConfig,
@@ -975,10 +975,7 @@ describe('Integration tests for P2P library', () => {
         expect(firstPeerErrors).to.have.length(1);
         expect(firstPeerErrors[0])
           .to.have.property('name')
-          .which.equals('BadConnectionError');
-        expect(firstPeerErrors[0])
-          .to.have.property('name')
-          .which.equals('BadConnectionError');
+          .which.equals('RPCResponseError');
         expect(firstPeerDuplicate)
           .to.have.property('state')
           .which.equals(ConnectionState.CLOSED);
