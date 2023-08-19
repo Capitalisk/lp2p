@@ -120,10 +120,10 @@ const selectRandomPeerSample = (peerList, count) => shuffle(peerList).slice(0, c
 class P2P extends EventEmitter {
   constructor(config) {
     super();
-    this.blacklistedIPs = config.blacklistedIPs || [];
+    this._blacklistedIPs = config.blacklistedIPs || [];
     this._sanitizedPeerLists = sanitizePeerLists(
       {
-        blacklistedIPs: this.blacklistedIPs,
+        blacklistedIPs: this._blacklistedIPs,
         seedPeers: config.seedPeers || [],
         fixedPeers: config.fixedPeers || [],
         whitelisted: config.whitelistedPeers || [],
@@ -289,7 +289,7 @@ class P2P extends EventEmitter {
     // When peer is fetched for status after connection then update the peerinfo in triedPeer list
     this._handleDiscoveredPeer = (detailedPeerInfo) => {
       // Check blacklist to avoid incoming connections from backlisted ips
-      const isBlacklisted = this.blacklistedIPs.find(
+      const isBlacklisted = this._blacklistedIPs.find(
         peerIpAddress => peerIpAddress === detailedPeerInfo.ipAddress,
       );
 
@@ -527,7 +527,7 @@ class P2P extends EventEmitter {
         const normalizedRemoteAddress = normalizeAddress(socket.remoteAddress).address;
 
         // Check blacklist to avoid incoming connections from backlisted ips
-        if (this.blacklistedIPs.includes(normalizedRemoteAddress)) {
+        if (this._blacklistedIPs.includes(normalizedRemoteAddress)) {
           this._disconnectSocketDueToFailedHandshake(
             socket,
             FORBIDDEN_CONNECTION,
