@@ -1889,7 +1889,7 @@ describe('Integration tests for P2P library', () => {
         const nodePort = NETWORK_START_PORT + index;
 
         return new P2P({
-          blacklistedPeers: [],
+          blacklistedIPs: [],
           connectTimeout: 200,
           ackTimeout: 200,
           seedPeers,
