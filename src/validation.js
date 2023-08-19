@@ -210,9 +210,7 @@ const sanitizePeerInfo = (peerInfo) => {
 };
 
 const sanitizePeerLists = (lists, nodeInfo) => {
-  const blacklistedPeers = [...lists.blacklistedPeers];
-
-  const blacklistedIPs = blacklistedPeers.map(peerInfo => peerInfo.ipAddress);
+  const blacklistedIPs = lists.blacklistedIPs;
 
   const seedPeers = lists.seedPeers
     .map(sanitizePeerInfo)
@@ -271,7 +269,6 @@ const sanitizePeerLists = (lists, nodeInfo) => {
     });
 
   return {
-    blacklistedPeers,
     seedPeers,
     fixedPeers,
     whitelisted,

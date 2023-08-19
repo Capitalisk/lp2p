@@ -120,10 +120,11 @@ const selectRandomPeerSample = (peerList, count) => shuffle(peerList).slice(0, c
 class P2P extends EventEmitter {
   constructor(config) {
     super();
+    this.blacklistedIPs = config.blacklistedIPs || [];
     this._sanitizedPeerLists = sanitizePeerLists(
       {
+        blacklistedIPs: this.blacklistedIPs,
         seedPeers: config.seedPeers || [],
-        blacklistedPeers: config.blacklistedPeers || [],
         fixedPeers: config.fixedPeers || [],
         whitelisted: config.whitelistedPeers || [],
         previousPeers: config.previousPeers || [],
@@ -287,10 +288,9 @@ class P2P extends EventEmitter {
 
     // When peer is fetched for status after connection then update the peerinfo in triedPeer list
     this._handleDiscoveredPeer = (detailedPeerInfo) => {
-      const peerId = getPeerIdFromPeerInfo(detailedPeerInfo);
       // Check blacklist to avoid incoming connections from backlisted ips
-      const isBlacklisted = this._sanitizedPeerLists.blacklistedPeers.find(
-        peer => getPeerIdFromPeerInfo(peer) === peerId,
+      const isBlacklisted = this.blacklistedIPs.find(
+        peerIpAddress => peerIpAddress === detailedPeerInfo.ipAddress,
       );
 
       if (!this._peerBook.getPeer(detailedPeerInfo) && !isBlacklisted) {
@@ -527,19 +527,14 @@ class P2P extends EventEmitter {
         const normalizedRemoteAddress = normalizeAddress(socket.remoteAddress).address;
 
         // Check blacklist to avoid incoming connections from backlisted ips
-        if (this._sanitizedPeerLists.blacklistedPeers) {
-          const blacklist = this._sanitizedPeerLists.blacklistedPeers.map(
-            peer => peer.ipAddress,
+        if (this.blacklistedIPs.includes(normalizedRemoteAddress)) {
+          this._disconnectSocketDueToFailedHandshake(
+            socket,
+            FORBIDDEN_CONNECTION,
+            FORBIDDEN_CONNECTION_REASON,
           );
-          if (blacklist.includes(normalizedRemoteAddress)) {
-            this._disconnectSocketDueToFailedHandshake(
-              socket,
-              FORBIDDEN_CONNECTION,
-              FORBIDDEN_CONNECTION_REASON,
-            );
 
-            return;
-          }
+          return;
         }
 
         if (!socket.request.url) {
