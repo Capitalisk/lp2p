@@ -130,6 +130,7 @@ class PeerList {
         success: false,
         isAdded: false,
         evictedPeer: undefined,
+        message: 'No matching bucket',
       };
     }
 
@@ -138,6 +139,7 @@ class PeerList {
         success: false,
         isAdded: false,
         evictedPeer: undefined,
+        message: 'Peer already present in bucket',
       };
     }
 
@@ -150,6 +152,7 @@ class PeerList {
         success: true,
         isAdded: true,
         evictedPeer: undefined,
+        message: 'Add peer without eviction',
       };
     }
 
@@ -160,6 +163,7 @@ class PeerList {
       success: !!evictedPeer,
       isAdded: true,
       evictedPeer: evictedPeer ? evictedPeer.peerInfo : undefined,
+      message: 'Add peer with possible eviction',
     };
   }
 

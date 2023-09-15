@@ -18,7 +18,7 @@ const { EventEmitter } = require('events');
 const http = require('http');
 
 const shuffle = require('lodash.shuffle');
-const { attach, SCServer, SCServerSocket } = require('socketcluster-server');
+const { attach } = require('socketcluster-server');
 const url = require('url');
 
 const { REMOTE_RPC_GET_PEERS_LIST } = require('./peer');
@@ -39,6 +39,10 @@ const {
   INVALID_CONNECTION_URL_CODE,
   INVALID_CONNECTION_URL_REASON,
 } = require('./disconnect_status_codes');
+
+const {
+  wait,
+} = require('./utils');
 
 const { PeerInboundHandshakeError } = require('./errors');
 
@@ -93,6 +97,7 @@ const DEFAULT_NODE_HOST_IP = '::';
 const DEFAULT_DISCOVERY_INTERVAL = 30000;
 const DEFAULT_BAN_TIME = 86400;
 const DEFAULT_POPULATOR_INTERVAL = 10000;
+const DEFAULT_POPULATOR_START_DELAY = 0;
 const DEFAULT_SEND_PEER_LIMIT = 24;
 // Max rate of WebSocket messages per second per peer.
 const DEFAULT_WS_MAX_MESSAGE_RATE = 100;
@@ -100,6 +105,8 @@ const DEFAULT_WS_MAX_MESSAGE_RATE_PENALTY = 100;
 const DEFAULT_RATE_CALCULATION_INTERVAL = 1000;
 const DEFAULT_WS_MAX_PAYLOAD_OUTBOUND = 3000000; // Size in bytes
 const DEFAULT_WS_MAX_PAYLOAD_INBOUND = 40000; // Size in bytes
+
+const DEFAULT_READY_TIMEOUT = 20000;
 
 const BASE_10_RADIX = 10;
 const DEFAULT_MAX_OUTBOUND_CONNECTIONS = 20;
@@ -135,6 +142,9 @@ class P2P extends EventEmitter {
       },
     );
     this._config = config;
+    this._readyTimeout = config.readyTimeout
+      ? config.readyTimeout
+      : DEFAULT_READY_TIMEOUT;
     this._isActive = false;
     this._hasConnected = false;
     this._peerBook = new PeerBook({
@@ -423,6 +433,10 @@ class P2P extends EventEmitter {
     this._nodeInfo = config.nodeInfo;
     this.applyNodeInfo(this._nodeInfo);
 
+    this._populatorStartDelay = config.populatorStartDelay == null
+      ? DEFAULT_POPULATOR_START_DELAY
+      : config.populatorStartDelay;
+
     this._populatorInterval = config.populatorInterval
       ? config.populatorInterval
       : DEFAULT_POPULATOR_INTERVAL;
@@ -521,9 +535,8 @@ class P2P extends EventEmitter {
   }
 
   async _startPeerServer() {
-    this._scServer.on(
-      'connection',
-      (socket) => {
+    (async () => {
+      for await (let { socket } of this._scServer.listener('connection')) {
         const normalizedRemoteAddress = normalizeAddress(socket.remoteAddress).address;
 
         // Check blacklist to avoid incoming connections from backlisted ips
@@ -534,7 +547,7 @@ class P2P extends EventEmitter {
             FORBIDDEN_CONNECTION_REASON,
           );
 
-          return;
+          continue;
         }
 
         if (!socket.request.url) {
@@ -544,11 +557,10 @@ class P2P extends EventEmitter {
             INVALID_CONNECTION_URL_REASON,
           );
 
-          return;
+          continue;
         }
 
         const queryObject = url.parse(socket.request.url, true).query;
-
         if (queryObject.nonce === this._nodeInfo.nonce) {
           this._disconnectSocketDueToFailedHandshake(
             socket,
@@ -560,13 +572,19 @@ class P2P extends EventEmitter {
             ? +queryObject.wsPort
             : this._nodeInfo.wsPort;
 
-          // Delete you peerinfo from both the lists
-          this._peerBook.removePeer({
+          let selfPeerInfo = {
             ipAddress: normalizedRemoteAddress,
             wsPort: selfWSPort,
-          });
+          };
 
-          return;
+          // Remove peer on next tick to ensure that any pending connect events
+          // which may be adding the peer will be processed first.
+          await wait(0);
+
+          // Delete you peerinfo from both the lists
+          this._peerBook.removePeer(selfPeerInfo);
+
+          continue;
         }
 
         if (
@@ -579,7 +597,7 @@ class P2P extends EventEmitter {
             INVALID_CONNECTION_QUERY_REASON,
           );
 
-          return;
+          continue;
         }
 
         let wsPort;
@@ -593,24 +611,6 @@ class P2P extends EventEmitter {
           wsPort,
         });
 
-        // tslint:disable-next-line no-let
-        let queryOptions;
-
-        try {
-          queryOptions =
-            typeof queryObject.options === 'string'
-              ? JSON.parse(queryObject.options)
-              : undefined;
-        } catch (error) {
-          this._disconnectSocketDueToFailedHandshake(
-            socket,
-            INVALID_CONNECTION_QUERY_CODE,
-            INVALID_CONNECTION_QUERY_REASON,
-          );
-
-          return;
-        }
-
         if (this._bannedPeers.has(normalizedRemoteAddress)) {
           this._disconnectSocketDueToFailedHandshake(
             socket,
@@ -618,15 +618,13 @@ class P2P extends EventEmitter {
             FORBIDDEN_CONNECTION_REASON,
           );
 
-          return;
+          continue;
         }
 
         const incomingPeerInfo = {
           ...queryObject,
-          ...queryOptions,
           ipAddress: normalizedRemoteAddress,
           wsPort,
-          height: queryObject.height ? +queryObject.height : 0,
           version: queryObject.version,
         };
 
@@ -647,7 +645,7 @@ class P2P extends EventEmitter {
             incompatibilityReason,
           );
 
-          return;
+          continue;
         }
 
         const existingPeer = this._peerPool.getInboundPeer(peerId);
@@ -670,25 +668,19 @@ class P2P extends EventEmitter {
         ) {
           this._peerBook.addPeer(incomingPeerInfo);
         }
-      },
-    );
+      }
+    })();
+
+    if (!this._scServer.isReady) {
+      await this._scServer.listener('ready').once(this._readyTimeout);
+    }
 
     this._httpServer.listen(
       this._nodeInfo.wsPort,
       this._config.hostIp || DEFAULT_NODE_HOST_IP,
     );
-    if (this._scServer.isReady) {
-      this._isActive = true;
 
-      return;
-    }
-
-    return new Promise(resolve => {
-      this._scServer.once('ready', () => {
-        this._isActive = true;
-        resolve();
-      });
-    });
+    this._isActive = true;
   }
 
   async _stopHTTPServer() {
@@ -700,11 +692,7 @@ class P2P extends EventEmitter {
   }
 
   async _stopWSServer() {
-    return new Promise(resolve => {
-      this._scServer.close(() => {
-        resolve();
-      });
-    });
+    await this._scServer.close();
   }
 
   async _stopPeerServer() {
@@ -762,6 +750,7 @@ class P2P extends EventEmitter {
       : DEFAULT_MAX_PEER_DISCOVERY_RESPONSE_LENGTH;
 
     const knownPeers = this._peerBook.getAllPeers();
+
     /* tslint:disable no-magic-numbers*/
     const min = Math.ceil(
       Math.min(peerDiscoveryResponseLength, knownPeers.length * 0.25),
@@ -821,11 +810,13 @@ class P2P extends EventEmitter {
       }
     });
 
-    // According to LIP, add whitelist peers to triedPeer by upgrading them initially.
     this._sanitizedPeerLists.whitelisted.forEach(whitelistPeer =>
       this._peerBook.upgradePeer(whitelistPeer),
     );
+
     await this._startPeerServer();
+
+    await wait(this._populatorStartDelay);
 
     // We need this check this._isActive in case the P2P library is shut down while it was in the middle of starting up.
     if (this._isActive) {

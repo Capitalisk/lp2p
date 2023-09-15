@@ -18,7 +18,7 @@ const DEFAULT_NEW_BUCKET_SIZE = 32;
 const DEFAULT_TRIED_BUCKET_COUNT = 64;
 const DEFAULT_TRIED_BUCKET_SIZE = 32;
 
-const { PEER_TYPE } = require('../utils');
+const { PEER_TYPE, getPeerIdFromPeerInfo } = require('../utils');
 const { NewList, NewListConfig } = require('./new_list');
 const { AddPeerOutcome } = require('./peer_list');
 const { TriedList, TriedListConfig } = require('./tried_list');
@@ -90,7 +90,12 @@ class PeerBook {
       this._triedPeers.getPeer(peerInfo) ||
       this._newPeers.getPeer(peerInfo)
     ) {
-      throw new Error('Peer already exists');
+      return {
+        success: false,
+        isAdded: false,
+        evictedPeer: undefined,
+        message: 'Peer already present',
+      };
     }
 
     return this._newPeers.addPeer(peerInfo);

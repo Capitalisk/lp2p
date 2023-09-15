@@ -17,7 +17,6 @@
 
 const {
   ClientOptionsUpdated,
-  convertNodeInfoToLegacyFormat,
   DEFAULT_ACK_TIMEOUT,
   DEFAULT_CONNECT_TIMEOUT,
   EVENT_FAILED_TO_COLLECT_PEER_DETAILS_ON_CONNECT,
@@ -41,7 +40,7 @@ const RESPONSE_PONG = 'pong';
 const PEER_KIND_OUTBOUND = 'outbound';
 
 const socketErrorStatusCodes = {
-  ...socketClusterClient.SCClientSocket.errorStatuses,
+  ...socketClusterClient.AGClientSocket.errorStatuses,
   1000: 'Intentionally disconnected',
 };
 
@@ -49,14 +48,6 @@ class OutboundPeer extends Peer {
   constructor(peerInfo, peerConfig) {
     super(peerInfo, peerConfig);
     this.kind = PEER_KIND_OUTBOUND;
-  }
-
-  set socket(scClientSocket) {
-    if (this._socket) {
-      this._unbindHandlersFromOutboundSocket(this._socket);
-    }
-    this._socket = scClientSocket;
-    this._bindHandlersToOutboundSocket(this._socket);
   }
 
   send(packet) {
@@ -76,9 +67,7 @@ class OutboundPeer extends Peer {
   }
 
   _createOutboundSocket() {
-    const legacyNodeInfo = this._nodeInfo
-      ? convertNodeInfoToLegacyFormat(this._nodeInfo)
-      : undefined;
+    const nodeInfo = this._nodeInfo ? this._nodeInfo : undefined;
 
     const connectTimeout = this._peerConfig.connectTimeout
       ? this._peerConfig.connectTimeout
@@ -92,19 +81,18 @@ class OutboundPeer extends Peer {
       hostname: isIPv6(this._ipAddress) ? `[${this._ipAddress}]` : this._ipAddress,
       port: this._wsPort,
       query: querystring.stringify({
-        ...legacyNodeInfo,
-        options: JSON.stringify(legacyNodeInfo),
+        ...nodeInfo,
       }),
       connectTimeout,
       ackTimeout,
-      multiplex: false,
       autoConnect: false,
       autoReconnect: false,
-      maxPayload: this._peerConfig.wsMaxPayloadOutbound,
+      wsOptions: {
+        maxPayload: this._peerConfig.wsMaxPayloadOutbound,
+      },
     };
 
     const outboundSocket = socketClusterClient.create(clientOptions);
-
     this._bindHandlersToOutboundSocket(outboundSocket);
 
     return outboundSocket;
@@ -119,18 +107,25 @@ class OutboundPeer extends Peer {
 
   disconnect(code = 1000, reason) {
     super.disconnect(code, reason);
+
     if (this._socket) {
       this._unbindHandlersFromOutboundSocket(this._socket);
     }
   }
 
+  async _bindEventHandlerToSocket(socket, eventName, handler) {
+    for await (let event of socket.listener(eventName)) {
+      handler(event);
+    }
+  }
+
   // All event handlers for the outbound socket should be bound in this method.
   _bindHandlersToOutboundSocket(outboundSocket) {
-    outboundSocket.on('error', (error) => {
+    this._bindEventHandlerToSocket(outboundSocket, 'error', ({error}) => {
       this.emit(EVENT_OUTBOUND_SOCKET_ERROR, error);
     });
 
-    outboundSocket.on('connect', async () => {
+    this._bindEventHandlerToSocket(outboundSocket, 'connect', async () => {
       this.emit(EVENT_CONNECT_OUTBOUND, this._peerInfo);
       try {
         await Promise.all([this.fetchStatus(), this.discoverPeers()]);
@@ -139,69 +134,61 @@ class OutboundPeer extends Peer {
       }
     });
 
-    outboundSocket.on('connectAbort', () => {
+    this._bindEventHandlerToSocket(outboundSocket, 'connectAbort', () => {
       this.emit(EVENT_CONNECT_ABORT_OUTBOUND, this._peerInfo);
     });
 
-    outboundSocket.on(
-      'close',
-      (code, reasonMessage) => {
-        const reason = reasonMessage
-          ? reasonMessage
-          : socketErrorStatusCodes[code] || 'Unknown reason';
-        this.emit(EVENT_CLOSE_OUTBOUND, {
-          peerInfo: this._peerInfo,
-          code,
-          reason,
-        });
-      },
-    );
+    this._bindEventHandlerToSocket(outboundSocket, 'close', ({code, reason}) => {
+      const sanitizedReason = reason
+        ? reason
+        : socketErrorStatusCodes[code] || 'Unknown reason';
 
-    outboundSocket.on('message', this._handleWSMessage);
+      this.emit(EVENT_CLOSE_OUTBOUND, {
+        peerInfo: this._peerInfo,
+        code,
+        reason: sanitizedReason,
+      });
+    });
 
-    outboundSocket.on(
-      EVENT_PING,
-      (data, res) => {
-        res(undefined, RESPONSE_PONG);
-      },
-    );
+    this._bindEventHandlerToSocket(outboundSocket, 'message', this._handleWSMessage);
 
-    // Bind RPC and remote event handlers
-    outboundSocket.on(REMOTE_EVENT_RPC_REQUEST, this._handleRawRPC);
-    outboundSocket.on(REMOTE_EVENT_MESSAGE, this._handleRawMessage);
-    outboundSocket.on('postBlock', this._handleRawLegacyMessagePostBlock);
-    outboundSocket.on(
-      'postSignatures',
-      this._handleRawLegacyMessagePostSignatures,
-    );
-    outboundSocket.on(
-      'postTransactions',
-      this._handleRawLegacyMessagePostTransactions,
-    );
+    (async () => {
+      for await (let request of outboundSocket.procedure(EVENT_PING)) {
+        request.end(RESPONSE_PONG);
+      }
+    })();
+
+    // Bind RPC and remote message handlers
+    (async () => {
+      for await (let request of outboundSocket.procedure(REMOTE_EVENT_RPC_REQUEST)) {
+        this._handleRawRPC(request);
+      }
+    })();
+
+    (async () => {
+      for await (let data of outboundSocket.receiver(REMOTE_EVENT_MESSAGE)) {
+        this._handleRawMessage(data);
+      }
+    })();
   }
 
   // All event handlers for the outbound socket should be unbound in this method.
   _unbindHandlersFromOutboundSocket(outboundSocket) {
-    // Do not unbind the error handler because error could still throw after disconnect.
-    // We don't want to have uncaught errors.
-    outboundSocket.off('connect');
-    outboundSocket.off('connectAbort');
-    outboundSocket.off('close');
-    outboundSocket.off('message', this._handleWSMessage);
+    // Close appends a packet to the end of the stream which will close all of
+    // its consumers.
+    outboundSocket.closeListener('error');
+    outboundSocket.closeListener('connect');
+    outboundSocket.closeListener('connectAbort');
+    outboundSocket.closeListener('close');
 
-    // Unbind RPC and remote event handlers
-    outboundSocket.off(REMOTE_EVENT_RPC_REQUEST, this._handleRawRPC);
-    outboundSocket.off(REMOTE_EVENT_MESSAGE, this._handleRawMessage);
-    outboundSocket.off('postBlock', this._handleRawLegacyMessagePostBlock);
-    outboundSocket.off(
-      'postSignatures',
-      this._handleRawLegacyMessagePostSignatures,
-    );
-    outboundSocket.off(
-      'postTransactions',
-      this._handleRawLegacyMessagePostTransactions,
-    );
-    outboundSocket.off(EVENT_PING);
+    // Streams which can be influenced by the peer need to be stopped immediately
+    // with kill instead of close.
+    outboundSocket.killListener('message');
+
+    outboundSocket.killProcedure(EVENT_PING);
+    outboundSocket.killProcedure(REMOTE_EVENT_RPC_REQUEST);
+
+    outboundSocket.killReceiver(REMOTE_EVENT_MESSAGE);
   }
 }
 
