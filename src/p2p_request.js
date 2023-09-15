@@ -16,32 +16,23 @@
 const { RPCResponseAlreadySentError } = require('./errors');
 
 class P2PRequest {
-  constructor(options, respondCallback) {
+  constructor(options, scRequest) {
     this._procedure = options.procedure;
     this._data = options.data;
     this._peerId = options.id;
     this._rate = options.rate;
-    options.productivity.requestCounter += 1;
-    this._respondCallback = (responseError, responsePacket) => {
-      if (this._wasResponseSent) {
-        throw new RPCResponseAlreadySentError(
-          `A response has already been sent for the request procedure <<${
-            options.procedure
-          }>>`,
-        );
-      }
-      this._wasResponseSent = true;
-      // We assume peer performed useful work and update peer response rate
-      if (!responseError && responsePacket) {
-        options.productivity.lastResponded = Date.now();
-        options.productivity.responseCounter += 1;
-        options.productivity.responseRate =
-          options.productivity.responseCounter /
-          options.productivity.requestCounter;
-      }
-      respondCallback(responseError, responsePacket);
-    };
-    this._wasResponseSent = false;
+    this._productivity = options.productivity;
+    this._scRequest = scRequest;
+  }
+
+  enforceResponseNotAlreadySent() {
+    if (this._scRequest.sent) {
+      throw new RPCResponseAlreadySentError(
+        `A response has already been sent for the request procedure <<${
+          this._procedure
+        }>>`,
+      );
+    }
   }
 
   get procedure() {
@@ -56,23 +47,29 @@ class P2PRequest {
     return this._rate;
   }
 
+  get productivity() {
+    return { ...this._productivity };
+  }
+
   get peerId() {
     return this._peerId;
   }
 
   get wasResponseSent() {
-    return this._wasResponseSent;
+    return this._scRequest.sent;
   }
 
   end(responseData) {
+    this.enforceResponseNotAlreadySent();
     const responsePacket = {
       data: responseData,
     };
-    this._respondCallback(undefined, responsePacket);
+    this._scRequest.end(responsePacket);
   }
 
   error(responseError) {
-    this._respondCallback(responseError);
+    this.enforceResponseNotAlreadySent();
+    this._scRequest.error(responseError);
   }
 }
 

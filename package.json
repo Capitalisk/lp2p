@@ -25,22 +25,23 @@
   "main": "src/index.js",
   "scripts": {
     "clean": "./scripts/clean.sh",
-    "test": "mocha test/{,/**/}{,/**/}/*.js --timeout 15000",
-    "test:unit": "mocha test/unit/{,/**/}/*.js",
-    "test:integration": "mocha test/integration/{,/**/}/*.js --timeout 15000",
+    "test": "./node_modules/.bin/mocha test/{,/**/}{,/**/}/*.js --timeout 30000",
+    "test:unit": "./node_modules/.bin/mocha test/unit/{,/**/}/*.js",
+    "test:integration": "./node_modules/.bin/mocha test/integration/{,/**/}/*.js --timeout 30000",
     "enableLocalIPs": "sudo ./scripts/enableTestLocalIPs.sh 10 19"
   },
   "dependencies": {
     "lodash.shuffle": "4.2.0",
     "semver": "5.6.0",
-    "socketcluster-client": "14.3.2",
-    "socketcluster-server": "14.7.2",
+    "socketcluster-client": "^18.0.1",
+    "socketcluster-server": "^18.0.2",
     "validator": "10.11.0"
   },
   "devDependencies": {
     "chai": "4.2.0",
     "chai-as-promised": "7.1.1",
-    "mocha": "^9.0.0",
+    "lodash.clonedeep": "^4.5.0",
+    "mocha": "^10.2.0",
     "sinon": "7.2.3",
     "sinon-chai": "3.3.0"
   }

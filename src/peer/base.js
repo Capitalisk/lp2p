@@ -77,18 +77,6 @@ const ConnectionState = {
   CLOSED: 'closed',
 };
 
-// Format the node info so that it will be valid from the perspective of both new and legacy nodes.
-const convertNodeInfoToLegacyFormat = (nodeInfo) => {
-  const { httpPort, nonce, broadhash } = nodeInfo;
-
-  return {
-    ...nodeInfo,
-    broadhash: broadhash ? broadhash : '',
-    nonce: nonce ? nonce : '',
-    httpPort: httpPort ? httpPort : 0,
-  };
-};
-
 class Peer extends EventEmitter {
   constructor(peerInfo, peerConfig) {
     super();
@@ -112,6 +100,7 @@ class Peer extends EventEmitter {
     this._wsMessageCount = 0;
     this._wsMessageRate = 0;
     this._rateInterval = this._peerConfig.rateCalculationInterval;
+
     this._counterResetInterval = setInterval(() => {
       this._wsMessageRate =
         (this._wsMessageCount * RATE_NORMALIZATION_FACTOR) / this._rateInterval;
@@ -141,6 +130,7 @@ class Peer extends EventEmitter {
       );
       this._messageCounter = new Map();
     }, this._rateInterval);
+
     this._productivityResetInterval = setInterval(() => {
       // If peer has not recently responded, reset productivity to 0
       if (
@@ -153,13 +143,14 @@ class Peer extends EventEmitter {
     this._productivity = { ...DEFAULT_PRODUCTIVITY };
 
     // This needs to be an arrow function so that it can be used as a listener.
-    this._handleRawRPC = (packet, respond) => {
-      // TODO later: Switch to LIP protocol format.
+    this._handleRawRPC = (scRequest) => {
+      let packet = scRequest.data;
+
       let rawRequest;
       try {
         rawRequest = validateRPCRequest(packet);
       } catch (err) {
-        respond(err);
+        scRequest.error(err);
         this.emit(EVENT_INVALID_REQUEST_RECEIVED, {
           packet,
           peerId: this._id,
@@ -179,7 +170,7 @@ class Peer extends EventEmitter {
           rate,
           productivity: this._productivity,
         },
-        respond,
+        scRequest,
       );
 
       if (rawRequest.procedure === REMOTE_RPC_UPDATE_PEER_INFO) {
@@ -197,7 +188,6 @@ class Peer extends EventEmitter {
 
     // This needs to be an arrow function so that it can be used as a listener.
     this._handleRawMessage = (packet) => {
-      // TODO later: Switch to LIP protocol format.
       // tslint:disable-next-line:no-let
       let message;
       try {
@@ -220,29 +210,6 @@ class Peer extends EventEmitter {
       };
 
       this.emit(EVENT_MESSAGE_RECEIVED, messageWithRateInfo);
-    };
-
-    // TODO later: Delete the following legacy message handlers.
-    // For the next LIP version, the send method will always emit a 'remote-message' event on the socket.
-    this._handleRawLegacyMessagePostBlock = (data) => {
-      this._handleRawMessage({
-        event: 'postBlock',
-        data,
-      });
-    };
-
-    this._handleRawLegacyMessagePostTransactions = (data) => {
-      this._handleRawMessage({
-        event: 'postTransactions',
-        data,
-      });
-    };
-
-    this._handleRawLegacyMessagePostSignatures = (data) => {
-      this._handleRawMessage({
-        event: 'postSignatures',
-        data,
-      });
     };
   }
 
@@ -326,14 +293,11 @@ class Peer extends EventEmitter {
       if (!this._socket) {
         throw new Error('Passive peer socket does not exist');
       }
-      this._socket.emit(REMOTE_MESSAGE_NODE_INFO_CHANGED, this._nodeInfo);
+      this._socket.transmit(REMOTE_MESSAGE_NODE_INFO_CHANGED, this._nodeInfo);
     } else {
-      // TODO later: This conversion step will not be needed after switching to the new LIP protocol version.
-      const legacyNodeInfo = convertNodeInfoToLegacyFormat(this._nodeInfo);
-      // TODO later: Consider using send instead of request for updateMyself for the next LIP protocol version.
       await this.request({
         procedure: REMOTE_RPC_UPDATE_PEER_INFO,
-        data: legacyNodeInfo,
+        data: this._nodeInfo,
       });
     }
   }
@@ -353,8 +317,8 @@ class Peer extends EventEmitter {
       this._active = false;
       clearInterval(this._counterResetInterval);
       clearInterval(this._productivityResetInterval);
-      if (this._socket && this._socket.active) {
-        this._socket.destroy(code, reason);
+      if (this._socket) {
+        this._socket.disconnect(code, reason);
       }
     }
   }
@@ -363,73 +327,57 @@ class Peer extends EventEmitter {
     if (!this._socket) {
       throw new Error('Peer socket does not exist');
     }
-
-    const legacyEvents = ['postBlock', 'postTransactions', 'postSignatures'];
-    // TODO later: Legacy events will no longer be required after migrating to the LIP protocol version.
-    if (legacyEvents.includes(packet.event)) {
-      // Emit legacy remote events.
-      this._socket.emit(packet.event, packet.data);
-    } else {
-      this._socket.emit(REMOTE_EVENT_MESSAGE, {
-        event: packet.event,
-        data: packet.data,
-      });
-    }
+    this._socket.transmit(REMOTE_EVENT_MESSAGE, {
+      event: packet.event,
+      data: packet.data,
+    });
   }
 
   async request(packet) {
-    return new Promise(
-      (resolve, reject) => {
-        let socket = this._socket;
-        if (!socket) {
-          throw new Error('Peer socket does not exist');
-        }
-        socket.emit(
-          REMOTE_EVENT_RPC_REQUEST,
-          {
-            type: '/RPCRequest',
-            procedure: packet.procedure,
-            data: packet.data,
-          },
-          (err, responseData) => {
-            if (err) {
-              if (err.name === 'TimeoutError') {
-                reject(
-                  new RPCTimeoutError(
-                    err.message,
-                    `${this.ipAddress}:${this.wsPort}`,
-                  )
-                );
-                setTimeout(() => {
-                  this.disconnect(FAILED_TO_RESPOND, FAILED_TO_RESPOND_REASON);
-                }, 0);
-              } else {
-                reject(
-                  new RPCResponseError(
-                    err.message,
-                    `${this.ipAddress}:${this.wsPort}`,
-                  )
-                );
-              }
+    this._productivity.requestCounter += 1;
+    let socket = this._socket;
+    if (!socket) {
+      throw new Error('Peer socket does not exist');
+    }
+    let responseData;
+    try {
+      responseData = await socket.invoke(REMOTE_EVENT_RPC_REQUEST, {
+        type: '/RPCRequest',
+        procedure: packet.procedure,
+        data: packet.data,
+      });
+    } catch (err) {
+      if (err.name === 'TimeoutError') {
 
-              return;
-            }
+        this.disconnect(FAILED_TO_RESPOND, FAILED_TO_RESPOND_REASON);
 
-            if (responseData) {
-              resolve(responseData);
-
-              return;
-            }
-
-            reject(
-              new RPCResponseError(
-                `Failed to handle response for procedure ${packet.procedure}`,
-                `${this.ipAddress}:${this.wsPort}`,
-              ),
-            );
-          },
+        throw new RPCTimeoutError(
+          err.message,
+          `${this.ipAddress}:${this.wsPort}`,
         );
-      },
+      } else {
+        throw new RPCResponseError(
+          err.message,
+          `${this.ipAddress}:${this.wsPort}`,
+        );
+      }
+
+      return;
+    }
+
+    if (responseData) {
+      this._productivity.lastResponded = Date.now();
+      this._productivity.responseCounter += 1;
+      this._productivity.responseRate =
+        this._productivity.responseCounter /
+        this._productivity.requestCounter;
+
+      return responseData;
+    }
+
+    throw new RPCResponseError(
+      `Failed to handle response for procedure ${packet.procedure}`,
+      `${this.ipAddress}:${this.wsPort}`,
     );
   }
 
@@ -438,7 +386,6 @@ class Peer extends EventEmitter {
       const response = await this.request({
         procedure: REMOTE_RPC_GET_PEERS_LIST,
       });
-
       return validatePeersInfoList(
         response.data,
         this._peerConfig.maxPeerDiscoveryResponseLength,
@@ -519,10 +466,10 @@ class Peer extends EventEmitter {
   }
 
   _handleGetNodeInfo(request) {
-    const legacyNodeInfo = this._nodeInfo
-      ? convertNodeInfoToLegacyFormat(this._nodeInfo)
+    const nodeInfo = this._nodeInfo
+      ? this._nodeInfo
       : {};
-    request.end(legacyNodeInfo);
+    request.end(nodeInfo);
   }
 
   _banPeer() {
@@ -580,6 +527,5 @@ module.exports = {
   DEFAULT_PRODUCTIVITY_RESET_INTERVAL,
   DEFAULT_PRODUCTIVITY,
   ConnectionState,
-  convertNodeInfoToLegacyFormat,
   Peer,
 };

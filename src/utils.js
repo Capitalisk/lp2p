@@ -226,6 +226,14 @@ const normalizePeerId = (peerId) => {
   return `[${host}]:${port}`;
 }
 
+function wait(duration) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve();
+    }, duration);
+  });
+}
+
 module.exports = {
   PEER_TYPE,
   hash,
@@ -240,4 +248,5 @@ module.exports = {
   normalizePeerId,
   PROTOCOL_IPV4,
   PROTOCOL_IPV6,
+  wait,
 };

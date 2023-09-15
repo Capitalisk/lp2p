@@ -20,9 +20,7 @@
 
 const { EventEmitter } = require('events');
 const shuffle = require('lodash.shuffle');
-const { SCServerSocket } = require('socketcluster-server');
 const { RequestFailError, SendFailError } = require('./errors');
-const { P2PRequest } = require('./p2p_request');
 const {
   ConnectionState,
   EVENT_BAN_PEER,
@@ -59,7 +57,6 @@ const MAX_PEER_DISCOVERY_PROBE_SAMPLE_SIZE = 100;
 const EVENT_REMOVE_PEER = 'removePeer';
 const INTENTIONAL_DISCONNECT_STATUS_CODE = 1000;
 
-// TODO: Move to events.ts.
 const EVENT_FAILED_TO_SEND_MESSAGE = 'failedToSendMessage';
 
 const PROTECTION_CATEGORY = {
@@ -139,6 +136,7 @@ class PeerPool extends EventEmitter {
       // Re-emit the message to allow it to bubble up the class hierarchy.
       this.emit(EVENT_CONNECT_ABORT_OUTBOUND, peerInfo);
     };
+
     this._handlePeerCloseOutbound = (closePacket) => {
       const peerId = getPeerIdFromPeerInfo(closePacket.peerInfo);
       this.removeOutboundPeer(
@@ -151,6 +149,7 @@ class PeerPool extends EventEmitter {
       // Re-emit the message to allow it to bubble up the class hierarchy.
       this.emit(EVENT_CLOSE_OUTBOUND, closePacket);
     };
+
     this._handlePeerCloseInbound = (closePacket) => {
       const peerId = getPeerIdFromPeerInfo(closePacket.peerInfo);
       this.removeInboundPeer(
@@ -325,7 +324,7 @@ class PeerPool extends EventEmitter {
 
     const mapToConnectedPeerInfo = (peerInfo) => {
       return {
-        kind: this._outboundPeerMap.get(getPeerIdFromPeerInfo(peerInfo)).kind,
+        kind: PEER_KIND_OUTBOUND,
         ...peerInfo
       };
     };
@@ -340,7 +339,7 @@ class PeerPool extends EventEmitter {
 
     const { outboundCount, inboundCount } = this.getPeersCountPerKind();
     const disconnectedFixedPeers = fixedPeers
-      .filter(peer => !this._outboundPeerMap.get(getPeerIdFromPeerInfo(peer)));
+      .filter(peer => !this._outboundPeerMap.has(getPeerIdFromPeerInfo(peer)));
 
     // This function can be customized so we should pass as much info as possible.
     const peersToConnect = this._peerSelectForConnection({
@@ -389,7 +388,6 @@ class PeerPool extends EventEmitter {
     if (this._nodeInfo) {
       this._applyNodeInfoOnPeer(peer, this._nodeInfo);
     }
-    peer.connect();
 
     return peer;
   }

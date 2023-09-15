@@ -17,12 +17,11 @@ const {
   PeerConfig,
   REMOTE_EVENT_MESSAGE,
   REMOTE_EVENT_RPC_REQUEST,
-  SCServerSocketUpdated,
 } = require('./base');
 
-const { SCServerSocket } = require('socketcluster-server');
+const { AGServerSocket } = require('socketcluster-server');
 const socketErrorStatusCodes = {
-  ...SCServerSocket.errorStatuses,
+  ...AGServerSocket.errorStatuses,
   1000: 'Intentionally disconnected',
 };
 
@@ -34,20 +33,24 @@ const DEFAULT_PING_INTERVAL_MAX = 60000;
 const DEFAULT_PING_INTERVAL_MIN = 20000;
 const PEER_KIND_INBOUND = 'inbound';
 
-const getRandomPingDelay = () =>
-  Math.random() * (DEFAULT_PING_INTERVAL_MAX - DEFAULT_PING_INTERVAL_MIN) +
-  DEFAULT_PING_INTERVAL_MIN;
+function getRandomPingDelay() {
+  return Math.round(
+    Math.random() *
+      (DEFAULT_PING_INTERVAL_MAX - DEFAULT_PING_INTERVAL_MIN) +
+      DEFAULT_PING_INTERVAL_MIN
+  );
+}
 
 class InboundPeer extends Peer {
   constructor(peerInfo, peerSocket, peerConfig) {
     super(peerInfo, peerConfig);
     this.kind = PEER_KIND_INBOUND;
-    this._handleInboundSocketError = (error) => {
+    this._handleInboundSocketError = ({error}) => {
       this.emit(EVENT_INBOUND_SOCKET_ERROR, error);
     };
-    this._handleInboundSocketClose = (code, reasonMessage) => {
-      const reason = reasonMessage
-        ? reasonMessage
+    this._handleInboundSocketClose = ({code, reason}) => {
+      const sanitizedReason = reason
+        ? reason
         : socketErrorStatusCodes[code] || 'Unknown reason';
       if (this._pingTimeoutId) {
         clearTimeout(this._pingTimeoutId);
@@ -55,24 +58,19 @@ class InboundPeer extends Peer {
       this.emit(EVENT_CLOSE_INBOUND, {
         peerInfo,
         code,
-        reason,
+        reason: sanitizedReason,
       });
     };
-    this._sendPing = () => {
+    this._sendPing = async () => {
       const pingStart = Date.now();
-      this._socket.emit(EVENT_PING, undefined, () => {
-        this._latency = Date.now() - pingStart;
-        this._pingTimeoutId = setTimeout(this._sendPing, getRandomPingDelay());
-      });
+      try {
+        await this._socket.invoke(EVENT_PING); // TODO 0000 TEST
+      } catch (error) {}
+      this._latency = Date.now() - pingStart;
+      this._pingTimeoutId = setTimeout(this._sendPing, getRandomPingDelay());
     };
     this._pingTimeoutId = setTimeout(this._sendPing, getRandomPingDelay());
     this._socket = peerSocket;
-    this._bindHandlersToInboundSocket(this._socket);
-  }
-
-  set socket(scServerSocket) {
-    this._unbindHandlersFromInboundSocket(this._socket);
-    this._socket = scServerSocket;
     this._bindHandlersToInboundSocket(this._socket);
   }
 
@@ -81,43 +79,46 @@ class InboundPeer extends Peer {
     this._unbindHandlersFromInboundSocket(this._socket);
   }
 
+  async _bindEventHandlerToSocket(socket, eventName, handler) {
+    for await (let event of socket.listener(eventName)) {
+      handler(event);
+    }
+  }
+
   // All event handlers for the inbound socket should be bound in this method.
   _bindHandlersToInboundSocket(inboundSocket) {
-    inboundSocket.on('close', this._handleInboundSocketClose);
-    inboundSocket.on('error', this._handleInboundSocketError);
-    inboundSocket.on('message', this._handleWSMessage);
+    this._bindEventHandlerToSocket(inboundSocket, 'error', this._handleInboundSocketError);
+    this._bindEventHandlerToSocket(inboundSocket, 'close', this._handleInboundSocketClose);
+    this._bindEventHandlerToSocket(inboundSocket, 'message', this._handleWSMessage);
 
-    // Bind RPC and remote event handlers
-    inboundSocket.on(REMOTE_EVENT_RPC_REQUEST, this._handleRawRPC);
-    inboundSocket.on(REMOTE_EVENT_MESSAGE, this._handleRawMessage);
-    inboundSocket.on('postBlock', this._handleRawLegacyMessagePostBlock);
-    inboundSocket.on(
-      'postSignatures',
-      this._handleRawLegacyMessagePostSignatures,
-    );
-    inboundSocket.on(
-      'postTransactions',
-      this._handleRawLegacyMessagePostTransactions,
-    );
+    // Bind RPC and remote message handlers
+    (async () => {
+      for await (let request of inboundSocket.procedure(REMOTE_EVENT_RPC_REQUEST)) {
+        this._handleRawRPC(request);
+      }
+    })();
+
+    (async () => {
+      for await (let data of inboundSocket.receiver(REMOTE_EVENT_MESSAGE)) {
+        this._handleRawMessage(data);
+      }
+    })();
   }
 
   // All event handlers for the inbound socket should be unbound in this method.
   _unbindHandlersFromInboundSocket(inboundSocket) {
-    inboundSocket.off('close', this._handleInboundSocketClose);
-    inboundSocket.off('message', this._handleWSMessage);
+    // Close appends a packet to the end of the stream which will close all of
+    // its consumers.
+    inboundSocket.closeListener('error');
+    inboundSocket.closeListener('close');
 
-    // Unbind RPC and remote event handlers
-    inboundSocket.off(REMOTE_EVENT_RPC_REQUEST, this._handleRawRPC);
-    inboundSocket.off(REMOTE_EVENT_MESSAGE, this._handleRawMessage);
-    inboundSocket.off('postBlock', this._handleRawLegacyMessagePostBlock);
-    inboundSocket.off(
-      'postSignatures',
-      this._handleRawLegacyMessagePostSignatures,
-    );
-    inboundSocket.off(
-      'postTransactions',
-      this._handleRawLegacyMessagePostTransactions,
-    );
+    // Streams which can be influenced by the peer need to be stopped immediately
+    // with kill instead of close.
+    inboundSocket.killListener('message');
+
+    inboundSocket.killProcedure(REMOTE_EVENT_RPC_REQUEST);
+
+    inboundSocket.killReceiver(REMOTE_EVENT_MESSAGE);
   }
 }
 
