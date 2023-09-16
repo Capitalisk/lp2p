@@ -1215,7 +1215,6 @@ describe('Integration tests for P2P library', () => {
       const { peers: peersList, nodeInfo } = input;
 
       peersList.forEach(peerInfo => {
-        // TODO: Use inbound and outbound strings from constants.ts
         if (peerInfo.kind !== 'inbound' && peerInfo.kind !== 'outbound') {
           throw new Error(`Invalid peer kind: ${peerInfo.kind}`);
         }

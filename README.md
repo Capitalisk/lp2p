@@ -28,6 +28,8 @@ limitations under the License.
 
 ---
 
+Copyright © 2020 Capitalisk
+
 Copyright © 2020 Leasehold Pty. Ltd.
 
 Copyright © 2016-2019 Lisk Foundation

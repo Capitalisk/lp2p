@@ -68,7 +68,6 @@ const initializeLongPeerInfoList = () => {
   let peerInfos = [];
   // Generate a realistic list in which 1 in 4 peers is outbound.
   for (let i = 0; i < 120; i++) {
-    // TODO: Get inbound and outbound strings from constants.ts.
     peerInfos.push({
       ipAddress: `204.120.0.${i}`,
       wsPort: 5001,
