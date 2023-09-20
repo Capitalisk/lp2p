@@ -1,6 +1,6 @@
 {
   "name": "lp2p",
-  "version": "5.0.0",
+  "version": "5.1.0",
   "description": "Unstructured P2P library for use with Lisk-related software",
   "author": "Leasehold",
   "license": "Apache-2.0",
