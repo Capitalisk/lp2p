@@ -32,10 +32,10 @@
   },
   "dependencies": {
     "lodash.shuffle": "4.2.0",
-    "semver": "5.6.0",
-    "socketcluster-client": "^19.0.2",
-    "socketcluster-server": "^19.0.1",
-    "validator": "10.11.0"
+    "semver": "^5.7.2",
+    "socketcluster-client": "^20.0.1",
+    "socketcluster-server": "^20.0.0",
+    "validator": "^13.15.23"
   },
   "devDependencies": {
     "chai": "4.2.0",
